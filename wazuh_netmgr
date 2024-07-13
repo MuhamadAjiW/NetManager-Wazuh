@@ -8,191 +8,211 @@ fi
 
 # Global Variables
 VERBOSE=0
+RSYSLOG_MARKER_MAIN="Wazuh_Netmgr"
 
 # Internal functions
 validate_ip() {
-    local ip=$1
-    if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-        local IFS='.'
-        local -a octets=($ip)
-        for octet in "${octets[@]}"; do
-            if ! [[ "$octet" -ge 0 && "$octet" -le 255 ]]; then
-                return 1  # Invalid IP range
-            fi
-        done
-        return 0  # Valid IP address
-    else
-        return 1  # Invalid IP format
-    fi
+	local ip=$1
+	if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+		IFS='.' read -r -a octets <<< "$ip"
+		for octet in "${octets[@]}"; do
+			if ! [[ "$octet" -ge 0 && "$octet" -le 255 ]]; then
+				return 1  # Invalid IP range
+			fi
+		done
+		return 0  # Valid IP address
+	else
+		return 1  # Invalid IP format
+	fi
+}
+
+validate_init(){
+	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$RSYSLOG_MARKER_MAIN>" "$WAZUH_NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
 
 # Commands
 func_show_help(){
-    echo "
+	echo "
 Usage: $0 [-v] [-c config]
 Commands:
-    status          Shows information of Wazuh Netmanager (Not wazuh itself)
+	init			Initializes Wazuh Netmanager environment
+	reset			Clears Wazuh Netmanager node and configurations
+	status			Shows information of Wazuh Netmanager (Not wazuh itself)
 	enable			Enables wazuh net logging (Basically opens port 514)
 	disable			Disables wazuh net logging (Basically closes port 514)
 	register		Registers a network node in wazuh
 	unregister		Unregisters a network node in wazuh
 
 Options:
-	-h			Shows this help message
+	-h				Shows this help message
 	-c <config>		Specifies configuration file
-	-v			Enable Verbose mode
+	-v				Enable Verbose mode
 
 
 Note:
-This script does not change the network appliances and should be configured separately.
+	This script does not change the network appliances and should be configured separately.
 	" 	
 }
 
+func_init(){
+	[ $VERBOSE -eq 1 ] && echo "Setting up Wazuh Netmanager"
+	
+	if validate_init; then
+		echo "Wazuh Netmanager has been setup already."
+	else
+		{
+		echo "# Configurations for Wazuh Netmanager, DO NOT MODIFY MANUALLY"
+		echo "# <$RSYSLOG_MARKER_MAIN>"
+		echo '# $ModLoad imudp'
+		echo '# $UDPServerRun 514'
+		echo ''
+		echo "# </$RSYSLOG_MARKER_MAIN>"
+		} > "$WAZUH_NETMGR_RSYSLOG_PATH"
+
+		echo "Wazuh Netmanager setup complete."
+	fi
+}
+
+func_reset(){
+	echo "Resetting Wazuh..."
+}
+
 func_status(){
-    echo "Checking wazuh Netmanager status..."
+	echo "Checking wazuh Netmanager status..."
 }
 
 func_enable(){
-    [ $VERBOSE -eq 1 ] && echo "Enabling wazuh net logging..."
+	[ $VERBOSE -eq 1 ] && echo "Enabling wazuh net logging..."
    
-    local count=0
+	local count=0
 
+	if grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+		[ $VERBOSE -eq 1 ] && echo "ServerRun line is commented out" 
+		sed -i 's/^[ ]*#[ ]*\$UDPServerRun 514/\$UDPServerRun 514/' "$WAZUH_NETMGR_RSYSLOG_PATH"  
+	else
+		((count++))
+	fi
 
-    if grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ModLoad line is commented out" 
-        sed -i 's/^[ ]*#[ ]*\$ModLoad imudp/\$ModLoad imudp/' "$RSYSLOG_CONF_PATH"
-    elif ! grep -Eq '^[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ModLoad line not found"
-        echo '$ModLoad imudp' >> "$RSYSLOG_CONF_PATH"
-    else
-        ((count++))
-    fi
-    
-    if grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ServerRun line is commented out" 
-        sed -i 's/^[ ]*#[ ]*\$UDPServerRun 514/\$UDPServerRun 514/' "$RSYSLOG_CONF_PATH"  
-    elif ! grep -Eq '^[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ServerRun line not found"
-        echo '$UDPServerRun 514' >> "$RSYSLOG_CONF_PATH"
-    else
-        ((count++))
-    fi
-    
-    if [ $count -eq 2 ]; then
-        echo "Wazuh net logging already enabled."
-    else
-        echo "Wazuh net logging enabled."
-    fi
+	if grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+		[ $VERBOSE -eq 1 ] && echo "ModLoad line is commented out" 
+		sed -i 's/^[ ]*#[ ]*\$ModLoad imudp/\$ModLoad imudp/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+	else
+		((count++))
+	fi	
+	
+	if [ $count -eq 2 ]; then
+		echo "Wazuh net logging has already been enabled."
+	else
+		echo "Wazuh net logging enabled."
+	fi
 }
 
 func_disable(){
-    [ $VERBOSE -eq 1 ] && echo "Disabling wazuh net logging..."
+	[ $VERBOSE -eq 1 ] && echo "Disabling wazuh net logging..."
 
-    local count=0
+	local count=0
 
-    if grep -Eq '^[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ModLoad line found"
-        sed -i 's/^[ ]*\$ModLoad imudp/# \$ModLoad imudp/' "$RSYSLOG_CONF_PATH"
-    else
-        ((count++))
-    fi
-    
-    if grep -Eq '^[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        [ $VERBOSE -eq 1 ] && echo "ServerRun line found"
-        sed -i 's/^[ ]*\$UDPServerRun 514/# \$UDPServerRun 514/' "$RSYSLOG_CONF_PATH"
-    else
-        ((count++))
-    fi
-    
-    if [ $count -eq 2 ]; then
-        echo "Wazuh net logging already disabled."
-    else
-        echo "Wazuh net logging disabled."
-    fi
+	if grep -Eq '^[ ]*\$ModLoad imudp' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+		[ $VERBOSE -eq 1 ] && echo "Commenting ModLoad line"
+		sed -i 's/^[ ]*\$ModLoad imudp/# \$ModLoad imudp/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+	else
+		((count++))
+	fi
+	
+	if grep -Eq '^[ ]*\$UDPServerRun 514' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+		[ $VERBOSE -eq 1 ] && echo "Commenting ServerRun line"
+		sed -i 's/^[ ]*\$UDPServerRun 514/# \$UDPServerRun 514/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+	else
+		((count++))
+	fi
+	
+	if [ $count -eq 2 ]; then
+		echo "Wazuh net logging has already been disabled."
+	else
+		echo "Wazuh net logging disabled."
+	fi
 }
 
 func_register(){
 	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh..."
-    #echo "0: $0"
-    #echo "1: $1"
-    #echo "2: $2"
-    #echo "ip: $ip"
 
-    # Set opt index
-    OPTIND=2
+	# Set opt index
+	OPTIND=2
 
-    local path=""
-    local ip=""
-    local name=""
+	local path=""
+	local ip=""
+	local name=""
 
-    while getopts "h?p:i:n:" opt; do
-        case "$opt" in
-        h|\?)
-            echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name]" && exit 0;;
-        p)  path=$OPTARG ;;
-        i) 	ip=$OPTARG   ;;
-        n)  name=$OPTARG  ;;
-        esac
-    done
-    shift $((OPTIND-1))
+	while getopts "h?p:i:n:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name]" && exit 0;;
+		p)	path=$OPTARG	;;
+		i)	ip=$OPTARG		;;
+		n)	name=$OPTARG	;;
+		esac
+	done
+	shift $((OPTIND-1))
 
-    if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
-        echo "Error: ip address, path, and name are required"
-        exit 1
-    elif ! validate_ip "$ip"; then
-        echo "Error: Invalid ip address argument"
-        exit 1
-    fi
+	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
+		echo "Error: ip address, path, and name are required"
+		exit 1
+	elif ! validate_ip "$ip"; then
+		echo "Error: Invalid ip address argument"
+		exit 1
+	fi
 
-    path="$WAZUH_NETMGR_LOG_PATH/$path"
+	path="$WAZUH_NETMGR_LOG_PATH/$path"
 
-    [ $VERBOSE -eq 1 ] && echo "
+	[ $VERBOSE -eq 1 ] && echo "
 Adding node:
-    ip: $ip
-    path: $path
-    name: $name
+	ip: $ip
+	path: $path
+	name: $name
 "
 }
 
 func_unregister(){
-    [ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh..."
+	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh..."
 }
 
 
 main(){
-    local config="./wazuh_netmgr.conf"
-    local action=""
+	local config="./wazuh_netmgr.conf"
+	local action=""
 
-    # Set opt index
-    OPTIND=1
+	# Set opt index
+	OPTIND=1
 
-    while getopts "h?vc:" opt; do
-        case "$opt" in
-        h|\?)   func_show_help && exit 0    ;;
-        v)      VERBOSE=1                   ;;
-        c) 	    config=$OPTARG              ;;
-        esac
-    done
-    shift $((OPTIND-1))
+	while getopts "h?vc:" opt; do
+		case "$opt" in
+		h|\?)	func_show_help && exit 0	;;
+		v)		VERBOSE=1					;;
+		c)		config=$OPTARG				;;
+		esac
+	done
+	shift $((OPTIND-1))
 
-    # Loads config
-    if [ -f "$config" ]; then
-        source "$config"
-    else
-        echo "Error: Configuration file $config not found or is not a regular file."
-        exit 1
-    fi
+	# Loads config
+	if [ -f "$config" ]; then
+		source "$config"
+	else
+		echo "Error: Configuration file $config not found or is not a regular file."
+		exit 1
+	fi
 
-    action="$1"
-    case "$action" in
-    "status")       func_status "$@"        ;;
-    "enable")       func_enable "$@"        ;;
-    "disable")      func_disable "$@"       ;;
-    "register")     func_register "$@"      ;;
-    "unregister")   func_unregister "$@"    ;;
-    *)              func_show_help          ;;
-    esac
+	action="$1"
+	case "$action" in
+	"init")			func_init				;;
+	"reset")		func_reset				;;
+	"status")		func_status				;;
+	"enable")		func_enable				;;
+	"disable")		func_disable			;;
+	"register")	 	func_register "$@"		;;
+	"unregister")   func_unregister "$@"	;;
+	*)				func_show_help			;;
+	esac
 }
 
 main "$@"
