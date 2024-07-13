@@ -94,7 +94,7 @@ func_reset(){
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager ossec configs..."
 	sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->/,/<!-- \/$RSYSLOG_MARKER_MAIN -->/d" "$WAZUH_CONF_PATH"
 	
-	echo "Wazuh Netmanager has been reset."
+	echo "Wazuh Netmanager has been reset. Use \"wazuh_netmgr reload\" for it to take effect."
 }
 
 func_status(){
@@ -123,7 +123,7 @@ func_enable(){
 	if [ $count -eq 2 ]; then
 		echo "Wazuh net logging has already been enabled."
 	else
-		echo "Wazuh net logging enabled."
+		echo "Wazuh net logging enabled. Use \"wazuh_netmgr reload\" for it to take effect."
 	fi
 }
 
@@ -149,7 +149,7 @@ func_disable(){
 	if [ $count -eq 2 ]; then
 		echo "Wazuh net logging has already been disabled."
 	else
-		echo "Wazuh net logging disabled."
+		echo "Wazuh net logging disabled. Use \"wazuh_netmgr reload\" for it to take effect."
 	fi
 }
 
@@ -226,7 +226,7 @@ sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->\\
 </localfile>\\
 " "$WAZUH_CONF_PATH"
 
-	echo "Node has been added."	
+	echo "Node has been added. Use \"wazuh_netmgr reload\" for it to take effect."	
 }
 
 func_unregister(){
@@ -263,7 +263,7 @@ func_unregister(){
 	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
 	sed -i "/<!-- $RSYSLOG_MARKER_NODE-$ip -->/,/<\/localfile>/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
-	echo "Node has been removed."
+	echo "Node has been removed. Use \"wazuh_netmgr reload\" for it to take effect."
 }
 
 
