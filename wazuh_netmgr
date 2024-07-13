@@ -9,6 +9,7 @@ fi
 # Global Variables
 VERBOSE=0
 RSYSLOG_MARKER_MAIN="Wazuh_Netmgr"
+RSYSLOG_MARKER_NODE="Nodes"
 
 # Internal functions
 validate_ip() {
@@ -61,13 +62,15 @@ func_init(){
 	if validate_init; then
 		echo "Wazuh Netmanager has been setup already."
 	else
+		[ $VERBOSE -eq 1 ] && echo "Setting up rsyslog configs..."
+
 		{
 		echo "# Configurations for Wazuh Netmanager, DO NOT MODIFY MANUALLY"
 		echo "# <$RSYSLOG_MARKER_MAIN>"
 		echo '# $ModLoad imudp'
 		echo '# $UDPServerRun 514'
 		echo ''
-		echo "# </$RSYSLOG_MARKER_MAIN>"
+		echo "# <$RSYSLOG_MARKER_NODE>"
 		} > "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 		echo "Wazuh Netmanager setup complete."
@@ -75,7 +78,12 @@ func_init(){
 }
 
 func_reset(){
-	echo "Resetting Wazuh..."
+	[ $VERBOSE -eq 1 ] && echo "Resetting Wazuh..."
+
+	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager rsyslog configs..."
+	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && rm $WAZUH_NETMGR_RSYSLOG_PATH
+	
+	echo "Wazuh Netmanager has been reset."
 }
 
 func_status(){
@@ -203,6 +211,14 @@ main(){
 	fi
 
 	action="$1"
+
+	if [ "$action" != "init" ]; then
+		if ! validate_init; then
+			echo "Error: Wazuh Netmanager has not been initialized yet, initialize with \"wazuh_netmgr init\""
+			exit 1
+		fi
+	fi
+
 	case "$action" in
 	"init")			func_init				;;
 	"reset")		func_reset				;;
