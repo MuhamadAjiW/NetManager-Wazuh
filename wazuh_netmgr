@@ -129,15 +129,10 @@ func_register(){
     while getopts "h?p:i:n:" opt; do
         case "$opt" in
         h|\?)
-            echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name]"
-            exit 0
-            ;;
-        p)  path=$OPTARG
-            ;;
-        i) 	ip=$OPTARG
-            ;;
-        n) name=$OPTARG
-            ;;
+            echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name]" && exit 0;;
+        p)  path=$OPTARG ;;
+        i) 	ip=$OPTARG   ;;
+        n)  name=$OPTARG  ;;
         esac
     done
     shift $((OPTIND-1))
