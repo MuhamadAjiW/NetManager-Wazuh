@@ -78,7 +78,7 @@ func_init(){
 		echo "<!-- $RSYSLOG_MARKER_MAIN -->"
 		echo ""
 		echo "<!-- /$RSYSLOG_MARKER_MAIN -->"
-		} > "$WAZUH_CONF_PATH"
+		} >> "$WAZUH_CONF_PATH"
 
 		echo "Wazuh Netmanager setup complete."
 	fi
