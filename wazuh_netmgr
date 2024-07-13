@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Must be run as root
+if [[ $EUID -ne 0 ]]; then
+	echo "This script must be run as root"
+	exit 1
+fi
+
+# Commands
+show_help(){
+    echo "Usage: $0 [-v] [-c config]"
+    echo "
+Commands:
+	enable			Enables wazuh net logging (Basically opens port 514)
+	disable			Disables wazuh net logging (Basically closes port 514)
+	register		Registers a network node in wazuh
+	unregister		Unregisters a network node in wazuh
+
+Options:
+	-h			Shows this help message
+	-c <config>		Specifies configuration file
+	-v			Enable Verbose mode
+
+
+Note:
+This script does not change the network appliances and should be configured separately.
+	" 	
+}
+
+add_node(){
+	echo "Configuring Wazuh to receive logs..."
+}
+
+setup(){
+	echo "Initializing Wazuh to receive logs..."
+}
+
+main(){
+    case "$action" in
+    "setup")
+        setup
+        ;;
+    "add_node")
+        add_node
+        ;;
+    *)
+        echo "Error: Invalid command provided"
+        show_help
+        exit 1
+        ;;
+    esac
+}
+
+# Initialize variables
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+verbose=0
+action=""
+config="./wazuh_netmgr.conf"
+
+while getopts "h?vc:" opt; do
+    case "$opt" in
+    h|\?)
+		show_help
+		exit 0
+		;;
+    v)  verbose=1
+		;;
+    c) 	config=$OPTARG
+		;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [ $# -eq 0 ]; then
+	echo "Error: No command provided."
+	show_help
+	exit 1
+fi
+
+# Check whether config file exists
+if [ ! -f "$config" ]; then
+	echo "Error: Configuration file $config not found or is not a regular file."
+	exit 1
+fi
+
+action=$1
+shift
+
+# Loads config
+source $config 
+
+main

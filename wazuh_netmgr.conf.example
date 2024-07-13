@@ -1,0 +1,11 @@
+#!/bin/bash
+# Configuration constants for wazuh_netmgr
+
+# Wazuh general configuration
+WAZUH_SERVER_IP="127.0.0.1"
+WAZUH_CONF_PATH="/var/ossec/etc/ossec.conf"
+WAZUH_LOG_PATH="/var/ossec/logs/ossec.log"
+
+# Wazuh Netmanager configuration
+WAZUH_NETMGR_LOG_PATH="/var/log/wazuh"
+WAZUH_NETMGR_DATA_PATH="./wazuh_netmgr.data"
