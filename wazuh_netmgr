@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Commands
-show_help(){
+func_show_help(){
     echo "Usage: $0 [-v] [-c config]"
     echo "
 Commands:
@@ -27,25 +27,68 @@ This script does not change the network appliances and should be configured sepa
 	" 	
 }
 
-add_node(){
-	echo "Configuring Wazuh to receive logs..."
+func_enable(){
+    echo "Enabling wazuh net logging..."
+   
+    var_enable_count=0
+
+    if grep -Eq '$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
+        echo "ModLoad line not found"
+        echo '$ModLoad imudp' >> "$RSYSLOG_CONF_PATH"
+    elif grep -Eq '^[[:space:]]*#.*$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
+        echo "ModLoad line is commented out" 
+        sed -i '^[[:space:]]*#.*$ModLoad imudp/s/^#//' "$RSYSLOG_CONF_PATH"
+    else
+        ((var_enable_count++))
+    fi
+    
+    if grep -Eq '$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
+        echo "ServerRun line not found"
+        echo '$UDPServerRun 514' >> "$RSYSLOG_CONF_PATH"
+    elif grep -Eq '^[[:space:]]*#.*$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
+        echo "ServerRun line is commented out" 
+        sed -i '^[[:space:]]*#.*$UDPServerRun 514/s/^#//' "$RSYSLOG_CONF_PATH"  
+    else
+        ((var_enable_count++))
+    fi
+    
+    if [ $var_enable_count -eq 2 ]; then
+        echo "Wazuh net logging already enabled"
+    else
+        echo "Wazuh net logging enabled."
+    fi
 }
 
-setup(){
-	echo "Initializing Wazuh to receive logs..."
+func_disable(){
+    echo "Disabling wazuh net logging..."
 }
+
+func_register(){
+	echo "Adding node to Wazuh..."
+}
+
+func_unregister(){
+    echo "Removing node from Wazuh..."
+}
+
 
 main(){
     case "$action" in
-    "setup")
-        setup
+    "enable")
+        func_enable
         ;;
-    "add_node")
-        add_node
+    "disable")
+        func_disable
+        ;;
+    "register")
+        func_register
+        ;;
+    "unregister")
+        func_unregister
         ;;
     *)
         echo "Error: Invalid command provided"
-        show_help
+        func_show_help
         exit 1
         ;;
     esac
@@ -60,7 +103,7 @@ config="./wazuh_netmgr.conf"
 while getopts "h?vc:" opt; do
     case "$opt" in
     h|\?)
-		show_help
+		func_show_help
 		exit 0
 		;;
     v)  verbose=1
@@ -73,7 +116,7 @@ shift $((OPTIND-1))
 
 if [ $# -eq 0 ]; then
 	echo "Error: No command provided."
-	show_help
+	func_show_help
 	exit 1
 fi
 
