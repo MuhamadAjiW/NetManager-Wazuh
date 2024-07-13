@@ -73,6 +73,13 @@ func_init(){
 		echo "# <$RSYSLOG_MARKER_NODE>"
 		} > "$WAZUH_NETMGR_RSYSLOG_PATH"
 
+		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
+		{
+		echo "<!-- $RSYSLOG_MARKER_MAIN -->"
+		echo ""
+		echo "<!-- /$RSYSLOG_MARKER_MAIN -->"
+		} > "$WAZUH_CONF_PATH"
+
 		echo "Wazuh Netmanager setup complete."
 	fi
 }
@@ -82,6 +89,9 @@ func_reset(){
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager rsyslog configs..."
 	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && rm $WAZUH_NETMGR_RSYSLOG_PATH
+
+	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager ossec configs..."
+	sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->/,/<!-- \/$RSYSLOG_MARKER_MAIN -->/d" "$WAZUH_CONF_PATH"
 	
 	echo "Wazuh Netmanager has been reset."
 }
@@ -164,7 +174,7 @@ func_register(){
 	shift $((OPTIND-1))
 
 	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
-		echo "Error: ip address, path, and name are required"
+		echo "Error: ip address, path, and a unique name is required"
 		exit 1
 	elif ! validate_ip "$ip"; then
 		echo "Error: Invalid ip address argument"
@@ -175,10 +185,27 @@ func_register(){
 
 	[ $VERBOSE -eq 1 ] && echo "
 Adding node:
-	ip: $ip
-	path: $path
-	name: $name
+ip: $ip
+path: $path
+name: $name
 "
+
+	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
+	sed -i "/# <$RSYSLOG_MARKER_NODE>/aif \$fromhost-ip startswith '$ip' then $path\\
+& ~" "$WAZUH_NETMGR_RSYSLOG_PATH"
+
+	[ $VERBOSE -eq 1 ] echo "Creating file in given path..."
+	touch $path
+
+	[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
+	chown syslog:adm $path
+
+	[ $VERBOSE -eq 1 ] && echo "Restarting rsyslog..."
+	# systemctl restart rsyslog
+
+	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration"
+
+	echo "Node has been added."	
 }
 
 func_unregister(){
