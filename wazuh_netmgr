@@ -9,7 +9,7 @@ fi
 # Global Variables
 VERBOSE=0
 RSYSLOG_MARKER_MAIN="Wazuh_Netmgr"
-RSYSLOG_MARKER_NODE="Nodes"
+RSYSLOG_MARKER_NODE="Wazuh_Netmgr_Node"
 
 # Internal functions
 validate_ip() {
@@ -76,7 +76,8 @@ func_init(){
 		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
 		{
 		echo "<!-- $RSYSLOG_MARKER_MAIN -->"
-		echo ""
+		echo "<ossec_config>"
+		echo "</ossec_config>"
 		echo "<!-- /$RSYSLOG_MARKER_MAIN -->"
 		} >> "$WAZUH_CONF_PATH"
 
@@ -152,6 +153,20 @@ func_disable(){
 	fi
 }
 
+func_reload(){
+	[ $VERBOSE -eq 1 ] && echo "Reloading Wazuh net..."
+	echo "Note: Error of wazuh-agent can be ignored if node is a manager, likewise if error of wazuh-manager if node is an agent."
+	
+	[ $VERBOSE -eq 1 ] && echo "Reloading rsyslog..."
+	systemctl restart rsyslog
+
+	[ $VERBOSE -eq 1 ] && echo "Reloading Wazuh..."
+	systemctl restart wazuh-agent
+	systemctl restart wazuh-manager
+
+	echo "Wazuh net reloaded."
+}
+
 func_register(){
 	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh..."
 
@@ -174,7 +189,7 @@ func_register(){
 	shift $((OPTIND-1))
 
 	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
-		echo "Error: ip address, path, and a unique name is required"
+		echo "Error: ip address, path, and a name is required"
 		exit 1
 	elif ! validate_ip "$ip"; then
 		echo "Error: Invalid ip address argument"
@@ -191,7 +206,8 @@ name: $name
 "
 
 	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
-	sed -i "/# <$RSYSLOG_MARKER_NODE>/aif \$fromhost-ip startswith '$ip' then $path\\
+	sed -i "/# <$RSYSLOG_MARKER_NODE>/a# $RSYSLOG_MARKER_NODE-$ip\\
+if \$fromhost-ip startswith '$ip' then $path\\
 & ~" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] echo "Creating file in given path..."
@@ -200,16 +216,54 @@ name: $name
 	[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
 	chown syslog:adm $path
 
-	[ $VERBOSE -eq 1 ] && echo "Restarting rsyslog..."
-	# systemctl restart rsyslog
-
-	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration"
+	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
+sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->\\
+<ossec_config>/a<!-- $RSYSLOG_MARKER_NODE-$ip -->\\
+<localfile>\\
+	<log_format>syslog</log_format>\\
+	<location>$path</location>\\
+	<out_format>$name: \$(log)</out_format>\\
+</localfile>\\
+" "$WAZUH_CONF_PATH"
 
 	echo "Node has been added."	
 }
 
 func_unregister(){
 	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh..."
+
+	# Set opt index
+	OPTIND=2
+
+	local ip=""
+
+	while getopts "h?i:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "Usage: wazuh_netmgr unregister [-i ip address]" && exit 0;;
+		i)	ip=$OPTARG		;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ -z "$ip" ]; then
+		echo "Error: ip address is required"
+		exit 1
+	elif ! validate_ip "$ip"; then
+		echo "Error: Invalid ip address argument"
+		exit 1
+	fi
+
+	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
+	sed -i "/# $ip/,/& ~/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+
+	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
+	[ -f "$path" ] && rm "$path"
+	
+	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
+	sed -i "/<!-- $RSYSLOG_MARKER_NODE-$ip -->/,/<\/localfile>/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+
+	echo "Node has been removed."
 }
 
 
