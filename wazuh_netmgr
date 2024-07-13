@@ -33,72 +33,69 @@ func_status(){
 }
 
 func_enable(){
-    echo "Enabling wazuh net logging..."
+    [ $verbose -eq 1 ] && echo "Enabling wazuh net logging..."
    
     var_enable_count=0
 
-    if ! grep -Eq '^[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        echo "ModLoad line not found"
-        echo '$ModLoad imudp' >> "$RSYSLOG_CONF_PATH"
-    elif grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        echo "ModLoad line is commented out" 
+    if grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ModLoad line is commented out" 
         sed -i 's/^[ ]*#[ ]*\$ModLoad imudp/\$ModLoad imudp/' "$RSYSLOG_CONF_PATH"
+    elif ! grep -Eq '^[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ModLoad line not found"
+        echo '$ModLoad imudp' >> "$RSYSLOG_CONF_PATH"
     else
         ((var_enable_count++))
     fi
     
-    if ! grep -Eq '^[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        echo "ServerRun line not found"
-        echo '$UDPServerRun 514' >> "$RSYSLOG_CONF_PATH"
-    elif grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        echo "ServerRun line is commented out" 
+    if grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ServerRun line is commented out" 
         sed -i 's/^[ ]*#[ ]*\$UDPServerRun 514/\$UDPServerRun 514/' "$RSYSLOG_CONF_PATH"  
+    elif ! grep -Eq '^[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ServerRun line not found"
+        echo '$UDPServerRun 514' >> "$RSYSLOG_CONF_PATH"
     else
         ((var_enable_count++))
     fi
     
     if [ $var_enable_count -eq 2 ]; then
-        echo "Wazuh net logging already enabled"
+        echo "Wazuh net logging already enabled."
     else
         echo "Wazuh net logging enabled."
     fi
 }
 
 func_disable(){
-    echo "Disabling wazuh net logging..."
+    [ $verbose -eq 1 ] && echo "Disabling wazuh net logging..."
 
     var_disable_count=0
 
-    if grep -Eq '$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
-        echo "ModLoad line not found"
-        sed -i '^[[:space:]]*#.*$ModLoad imudp/s/^#//' "$RSYSLOG_CONF_PATH"
+    if grep -Eq '^[ ]*\$ModLoad imudp' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ModLoad line found"
+        sed -i 's/^[ ]*\$ModLoad imudp/# \$ModLoad imudp/' "$RSYSLOG_CONF_PATH"
     else
         ((var_disable_count++))
     fi
     
-    if grep -q '$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        echo "ServerRun line not found"
-        echo '$UDPServerRun 514' >> "$RSYSLOG_CONF_PATH"
-    elif grep -q '^[[:space:]]*#.*$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
-        echo "ServerRun line is commented out" 
-        sed -i '^[[:space:]]*#.*$UDPServerRun 514/s/^#//' "$RSYSLOG_CONF_PATH"  
+    if grep -Eq '^[ ]*\$UDPServerRun 514' "$RSYSLOG_CONF_PATH"; then
+        [ $verbose -eq 1 ] && echo "ServerRun line found"
+        sed -i 's/^[ ]*\$UDPServerRun 514/# \$UDPServerRun 514/' "$RSYSLOG_CONF_PATH"
     else
         ((var_disable_count++))
     fi
     
     if [ $var_disable_count -eq 2 ]; then
-        echo "Wazuh net logging already enabled"
+        echo "Wazuh net logging already disabled."
     else
-        echo "Wazuh net logging enabled."
+        echo "Wazuh net logging disabled."
     fi
 }
 
 func_register(){
-	echo "Adding node to Wazuh..."
+	[ $verbose -eq 1 ] && echo "Adding node to Wazuh..."
 }
 
 func_unregister(){
-    echo "Removing node from Wazuh..."
+    [ $verbose -eq 1 ] && echo "Removing node from Wazuh..."
 }
 
 
