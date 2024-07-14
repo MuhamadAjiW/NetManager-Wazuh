@@ -28,7 +28,7 @@ validate_ip() {
 }
 
 validate_init(){
-	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$NETMGR_MARKER_MAIN>" "$WAZUH_NETMGR_RSYSLOG_PATH" && return 0 || return 1
+	[ -f "$NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$NETMGR_MARKER_MAIN>" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
 
@@ -72,7 +72,7 @@ func_init(){
 		echo '# $UDPServerRun 514'
 		echo ''
 		echo "# <$NETMGR_MARKER_NODE>"
-		} > "$WAZUH_NETMGR_RSYSLOG_PATH"
+		} > "$NETMGR_RSYSLOG_PATH"
 
 		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
 		{
@@ -91,7 +91,7 @@ func_reset(){
 	[ $VERBOSE -eq 1 ] && echo "Resetting Wazuh..."
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager rsyslog configs..."
-	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && rm $WAZUH_NETMGR_RSYSLOG_PATH
+	[ -f "$NETMGR_RSYSLOG_PATH" ] && rm $NETMGR_RSYSLOG_PATH
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager ossec configs..."
 	sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/d" "$WAZUH_CONF_PATH"
@@ -108,16 +108,16 @@ func_enable(){
    
 	local count=0
 
-	if grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+	if grep -Eq '^[ ]*#[ ]*\$UDPServerRun 514' "$NETMGR_RSYSLOG_PATH"; then
 		[ $VERBOSE -eq 1 ] && echo "ServerRun line is commented out" 
-		sed -i 's/^[ ]*#[ ]*\$UDPServerRun 514/\$UDPServerRun 514/' "$WAZUH_NETMGR_RSYSLOG_PATH"  
+		sed -i 's/^[ ]*#[ ]*\$UDPServerRun 514/\$UDPServerRun 514/' "$NETMGR_RSYSLOG_PATH"  
 	else
 		((count++))
 	fi
 
-	if grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+	if grep -Eq '^[ ]*#[ ]*\$ModLoad imudp' "$NETMGR_RSYSLOG_PATH"; then
 		[ $VERBOSE -eq 1 ] && echo "ModLoad line is commented out" 
-		sed -i 's/^[ ]*#[ ]*\$ModLoad imudp/\$ModLoad imudp/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+		sed -i 's/^[ ]*#[ ]*\$ModLoad imudp/\$ModLoad imudp/' "$NETMGR_RSYSLOG_PATH"
 	else
 		((count++))
 	fi	
@@ -134,16 +134,16 @@ func_disable(){
 
 	local count=0
 
-	if grep -Eq '^[ ]*\$ModLoad imudp' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+	if grep -Eq '^[ ]*\$ModLoad imudp' "$NETMGR_RSYSLOG_PATH"; then
 		[ $VERBOSE -eq 1 ] && echo "Commenting ModLoad line"
-		sed -i 's/^[ ]*\$ModLoad imudp/# \$ModLoad imudp/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+		sed -i 's/^[ ]*\$ModLoad imudp/# \$ModLoad imudp/' "$NETMGR_RSYSLOG_PATH"
 	else
 		((count++))
 	fi
 	
-	if grep -Eq '^[ ]*\$UDPServerRun 514' "$WAZUH_NETMGR_RSYSLOG_PATH"; then
+	if grep -Eq '^[ ]*\$UDPServerRun 514' "$NETMGR_RSYSLOG_PATH"; then
 		[ $VERBOSE -eq 1 ] && echo "Commenting ServerRun line"
-		sed -i 's/^[ ]*\$UDPServerRun 514/# \$UDPServerRun 514/' "$WAZUH_NETMGR_RSYSLOG_PATH"
+		sed -i 's/^[ ]*\$UDPServerRun 514/# \$UDPServerRun 514/' "$NETMGR_RSYSLOG_PATH"
 	else
 		((count++))
 	fi
@@ -200,7 +200,7 @@ func_register(){
 		exit 1
 	fi
 
-	path="$WAZUH_NETMGR_LOG_PATH/$path"
+	path="$NETMGR_LOG_PATH/$path"
 
 	[ $VERBOSE -eq 1 ] && echo "
 Adding node:
@@ -213,7 +213,7 @@ name: $name
 	sed -i "/# <$NETMGR_MARKER_NODE>/a# $NETMGR_MARKER_NODE-$ip\\
 if \$fromhost-ip startswith '$ip' then $path\\
 & ~\\
-# /$NETMGR_MARKER_NODE-$ip" "$WAZUH_NETMGR_RSYSLOG_PATH"
+# /$NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
 	local dir=$(dirname "$path")
@@ -265,7 +265,7 @@ func_unregister(){
 	fi
 
 	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
-	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
 	[ -f "$path" ] && rm "$path"
