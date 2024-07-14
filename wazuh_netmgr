@@ -212,7 +212,8 @@ name: $name
 	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
 	sed -i "/# <$NETMGR_MARKER_NODE>/a# $NETMGR_MARKER_NODE-$ip\\
 if \$fromhost-ip startswith '$ip' then $path\\
-& ~" "$WAZUH_NETMGR_RSYSLOG_PATH"
+& ~\\
+# /$NETMGR_MARKER_NODE-$ip" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
 	local dir=$(dirname "$path")
@@ -232,7 +233,7 @@ sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<osse
     <location>$path</location>\\
     <out_format>$name: \$(log)</out_format>\\
   </localfile>\\
-""
+<!-- /$NETMGR_MARKER_NODE-$ip -->""
 }" "$WAZUH_CONF_PATH"
 
 	echo "Node has been added. Use \"wazuh_netmgr reload\" for it to take effect."	
@@ -264,13 +265,13 @@ func_unregister(){
 	fi
 
 	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
-	sed -i "/# $ip/,/& ~/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
 	[ -f "$path" ] && rm "$path"
 	
 	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
-	sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<\/localfile>/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+	sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/d" "$WAZUH_CONF_PATH"
 
 	echo "Node has been removed. Use \"wazuh_netmgr reload\" for it to take effect."
 }
