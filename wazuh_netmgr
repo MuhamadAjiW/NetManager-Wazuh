@@ -60,6 +60,10 @@ netmgr_register_node(){
 	local path=$1
 	local ip=$2
 	local name=$3
+	local library=$4
+	local method=$5
+	local username=$6
+	local password=$7
 
 	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
 		echo "Error: ip address, path, and a name is required"
@@ -114,20 +118,17 @@ sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<osse
 netmgr_register_file(){
 	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh with file=$1..."
 	local file=$1
-	local path=""
-	local ip=""
-	local name=""
 
 	if [ ! -f "$file" ]; then
 		echo "Error: Input file not found or is not a regular file."
 		return 1
 	fi
 
-	while IFS=';' read -r path ip name; do
+	while IFS=';' read -r path ip name library method username password; do
 		if [[ -z "$path" || "$path" == "#"* ]]; then
 			continue
 		fi
-		netmgr_register_node "$path" "$ip" "$name" 
+		netmgr_register_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
 	done < "$file"
 
 	echo "Nodes from $file has been added."
@@ -149,7 +150,7 @@ netmgr_unregister_node(){
 	fi
 
 	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
-	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$NETMGR_RSYSLOG_PATH"
+	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip/d" "$NETMGR_RSYSLOG_PATH"
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
 	[ -f "$path" ] && rm "$path"
@@ -163,20 +164,18 @@ netmgr_unregister_node(){
 netmgr_unregister_file(){
 	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh with file=$1..."
 	local file=$1
-	local path=""
-	local ip=""
-	local name=""
 
 	if [ ! -f "$file" ]; then
 		echo "Error: Input file not found or is not a regular file."
 		return 1
 	fi
 
-	while IFS=';' read -r path ip name; do
+	while IFS=';' read -r path ip name method username password; do
 		if [[ -z "$path" || "$path" == "#"* ]]; then
 			continue
 		fi
-		netmgr_unregister_node "$ip" 
+		netmgr_unregister_node "$ip" "$library" "$method" "$username" "$password"
+
 	done < "$file"
 
 	echo "Nodes from $file has been removed."
@@ -348,21 +347,49 @@ func_register(){
 	local ip=""
 	local name=""
 	local file=""
+	local library=""
+	local method=""
+	local username=""
+	local password=""
 
-	while getopts "h?p:i:n:f:" opt; do
+	while getopts "h?o:i:n:f:l:m:u:p:" opt; do
 		case "$opt" in
 		h|\?)
-			echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name] or [-f file path]" && exit 0;;
-		p)	path=$OPTARG	;;
-		i)	ip=$OPTARG		;;
-		n)	name=$OPTARG	;;
-		f)	file=$OPTARG	;;
+			echo "
+Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f file path]
+
+Mandatory:
+	-o <output path>	: Specifies the path for incoming logs
+	-i <ip address>		: The ip address of the added node
+	-n <name>			: Name of the added node
+	
+	or (example file format at ./data/wazuh_netmgr.data.example)
+	-f <file path>		: The path for bulk adding nodes
+
+Optional:
+	-l <library>		: Library used for configuring the network appliance (default is none)
+	-m <method>			: Authentication method
+	-u <username>		: Username for password authentication
+	-p <password>		: Password for password authentication
+
+Authentication Methods:
+	none				: Does not configure the network appliance (default)
+	password			: Uses username and password
+" && exit 0;;
+		o)	path=$OPTARG		;;
+		i)	ip=$OPTARG			;;
+		n)	name=$OPTARG		;;
+		f)	file=$OPTARG		;;
+		l)	library=$OPTARG		;;
+		m)	method=$OPTARG		;;
+		u)	username=$OPTARG	;;
+		p)	password=$OPTARG	;;
 		esac
 	done
 	shift $((OPTIND-1))
 
 	if [ ! -z "$file" ]; then
-		if [ ! -z "$ip" ] || [ ! -z "$path" ] || [ ! -z "$name" ]; then
+		if [ ! -z "$ip" ] || [ ! -z "$path" ] || [ ! -z "$name" ] || [ ! -z "$library" ] || [ ! -z "$method" ] || [ ! -z "$username" ] || [ ! -z "$password" ] ; then
 			echo "Error: -f flag cannot be used at the same time with singular entry flags"
 			exit 1
 		fi
@@ -370,7 +397,19 @@ func_register(){
 		[ $? -ne 0 ] && exit $?
 
 	elif [ ! -z "$ip" ] && [ ! -z "$path" ] && [ ! -z "$name" ]; then
-		netmgr_register_node "$path" "$ip" "$name"
+		if [ ! -z "$library" ]; then
+			if [ "$method" == "password" ]; then
+				if [ -z "$username" ] || [ -z "$password" ]; then
+					echo "Error: -u username and -p password are necessary with -m method of password"
+					exit 1
+				fi
+			fi
+		else 
+			library="none"
+			username="none"
+			password="none"
+		fi
+		netmgr_register_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
 		[ $? -ne 0 ] && exit $?
 
 	else
