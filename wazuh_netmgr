@@ -13,6 +13,8 @@ NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
 
 # Internal functions
 validate_ip() {
+    [ $VERBOSE -eq 1 ] && echo "Validating ip..."
+
 	local ip=$1
 	if [[ $ip =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
 		IFS='.' read -r -a octets <<< "$ip"
@@ -28,7 +30,20 @@ validate_ip() {
 }
 
 validate_init(){
+    [ $VERBOSE -eq 1 ] && echo "Validating initialization..."
+
 	[ -f "$NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$NETMGR_MARKER_MAIN>" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
+}
+
+validate_node_exist(){
+    [ $VERBOSE -eq 1 ] && echo "Validating node registration..."
+
+	local ip=$1
+	if grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH"; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 
@@ -198,6 +213,9 @@ func_register(){
 	elif ! validate_ip "$ip"; then
 		echo "Error: Invalid ip address argument"
 		exit 1
+	elif validate_node_exist "$ip"; then
+		echo "Error: Node already registered"
+		exit 1
 	fi
 
 	path="$NETMGR_LOG_PATH/$path"
@@ -261,6 +279,9 @@ func_unregister(){
 		exit 1
 	elif ! validate_ip "$ip"; then
 		echo "Error: Invalid ip address argument"
+		exit 1
+	elif ! validate_node_exist "$ip"; then
+		echo "Error: Node is not registered"
 		exit 1
 	fi
 
