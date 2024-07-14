@@ -1,0 +1,10 @@
+#!/bin/bash
+# command library for cisco routers, not for use outside of wazuh_netmgr
+
+lib_config_password(){
+	local ip=$1
+	local username=$2
+	local password=$3
+
+	echo "Hello from Cisco-vIOS!"	
+}

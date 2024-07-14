@@ -65,6 +65,7 @@ netmgr_register_node(){
 	local username=$6
 	local password=$7
 	local fullpath=""
+	local libpath=""
 
 	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
 		echo "Error: ip address, path, and a name is required"
@@ -74,7 +75,31 @@ netmgr_register_node(){
 		return 1
 	elif validate_node_exist "$ip"; then
 		echo "Node $ip has already been registered"
-		return 0
+		return 1
+	elif [ "$method" != "none" ]; then
+		[ $VERBOSE -eq 1 ] && echo "Loading node library..."
+		libpath="$NETMGR_LIB_PATH/$library"
+
+		if [ ! -f "$libpath" ]; then
+			echo "Error: Library $libpath does not exist"
+			return 1
+		fi	
+
+		(
+			source "$libpath"
+
+			[ $VERBOSE -eq 1 ] && echo "Gaining access to network appliance..."
+			case "$method" in
+			password)
+				lib_config_password $ip $username $password
+				;;
+			*)
+				echo "Error: Method $method is invalid or not available."
+				return 1
+				;;
+			esac
+		)
+		[ $? -ne 0 ] && return $?
 	fi
 
 	fullpath="$NETMGR_LOG_PATH/$path"
@@ -122,6 +147,8 @@ sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<osse
 netmgr_register_file(){
 	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh with file=$1..."
 	local file=$1
+	local success=0
+	local total=0
 
 	if [ ! -f "$file" ]; then
 		echo "Error: Input file not found or is not a regular file."
@@ -133,9 +160,12 @@ netmgr_register_file(){
 			continue
 		fi
 		netmgr_register_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
+		[ $? -eq 0 ] && ((success++))
+		((total++))
+
 	done < "$file"
 
-	echo "Nodes from $file has been added."
+	echo "$success/$total Nodes from $file has been added."
 }
 
 netmgr_unregister_node(){
@@ -157,7 +187,7 @@ netmgr_unregister_node(){
 		return 1
 	elif ! validate_node_exist "$ip"; then
 		echo "Node $ip has already been unregistered"
-		return 0
+		return 1
 	fi
 
 	fullpath="$NETMGR_LOG_PATH/$path"
@@ -180,6 +210,8 @@ netmgr_unregister_node(){
 netmgr_unregister_file(){
 	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh with file=$1..."
 	local file=$1
+	local success=0
+	local total=0
 
 	if [ ! -f "$file" ]; then
 		echo "Error: Input file not found or is not a regular file."
@@ -191,9 +223,11 @@ netmgr_unregister_file(){
 			continue
 		fi
 		netmgr_unregister_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
+		[ $? -eq 0 ] && ((success++))
+		((total++))
 	done < "$file"
 
-	echo "Nodes from $file has been removed."
+	echo "$success/$total Nodes from $file has been removed."
 }
 
 
