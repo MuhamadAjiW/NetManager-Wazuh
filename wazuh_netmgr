@@ -91,7 +91,7 @@ netmgr_register_node(){
 			[ $VERBOSE -eq 1 ] && echo "Gaining access to network appliance..."
 			case "$method" in
 			password)
-				lib_config_password $ip $username $password
+				lib_register_password $ip $username $password
 				;;
 			*)
 				echo "Error: Method $method is invalid or not available."
@@ -188,6 +188,30 @@ netmgr_unregister_node(){
 	elif ! validate_node_exist "$ip"; then
 		echo "Node $ip has already been unregistered"
 		return 1
+	elif [ "$method" != "none" ]; then
+		[ $VERBOSE -eq 1 ] && echo "Loading node library..."
+		libpath="$NETMGR_LIB_PATH/$library"
+
+		if [ ! -f "$libpath" ]; then
+			echo "Error: Library $libpath does not exist"
+			return 1
+		fi	
+
+		(
+			source "$libpath"
+
+			[ $VERBOSE -eq 1 ] && echo "Gaining access to network appliance..."
+			case "$method" in
+			password)
+				lib_unregister_password $ip $username $password
+				;;
+			*)
+				echo "Error: Method $method is invalid or not available."
+				return 1
+				;;
+			esac
+		)
+		[ $? -ne 0 ] && return $?
 	fi
 
 	fullpath="$NETMGR_LOG_PATH/$path"

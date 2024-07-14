@@ -1,7 +1,8 @@
 #!/bin/bash
-# command library for cisco routers, do not use outside of wazuh_netmgr
+# Template for command library, do not use
 
 lib_execute_command(){
+	# TODO: Adjust command and logging
 	[ $VERBOSE -eq 1 ] && echo "Executing command on ssh..."
 	local method=$1
 	local ip=$2
@@ -34,50 +35,30 @@ EOF
 }
 
 lib_register_password(){
+	# TODO: Adjust command and logging
 	local ip=$1
 	local username=$2
 	local password=$3	
 	local retcode=0
-    local commands="
-enable
-conf t
-logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
-
-    echo "Registering Cisco-vIOS with ip: $ip..."
-    [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
+    local commands=""
 
 	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
 
 	retcode=$?
-    [ $retcode -eq 0 ] && echo "Cisco-vIOS registration success" || echo "Cisco-vIOS registration failed"
 	return $retcode
 }
 
 lib_unregister_password(){
+	# TODO: Adjust command and logging
 	local ip=$1
 	local username=$2
 	local password=$3
 	local retcode=0
-    local commands="
-enable
-conf t
-no logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
-
-    echo "Unregistering Cisco-vIOS with ip: $ip..."
-    [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
+    local commands=""
 
 	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
 
 	retcode=$?
-    [ $retcode -eq 0 ] && echo "Cisco-vIOS unregistration success" || echo "Cisco-vIOS unregistration failed"
 	return $retcode
 }
 
