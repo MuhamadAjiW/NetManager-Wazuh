@@ -35,15 +35,17 @@ validate_init(){
 	[ -f "$NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$NETMGR_MARKER_MAIN>" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
+validate_enable(){
+    [ $VERBOSE -eq 1 ] && echo "Validating enable status..."
+
+	grep -Eq '^\$UDPServerRun 514' "$NETMGR_RSYSLOG_PATH" && grep -Eq '^\$ModLoad imudp' "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
+}
+
 validate_node_exist(){
     [ $VERBOSE -eq 1 ] && echo "Validating node registration..."
 
 	local ip=$1
-	if grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH"; then
-		return 0
-	else
-		return 1
-	fi
+	grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
 
@@ -115,7 +117,24 @@ func_reset(){
 }
 
 func_status(){
-	echo "Checking wazuh Netmanager status..."
+	local initialized="False"
+	local enabled="False"
+	local node_count=0
+	
+	validate_init && initialized="True" || initialized="False"
+	validate_enable && enabled="True" || enabled="False"
+	node_count=$(grep -cE "# $NETMGR_MARKER_NODE-.+" "$NETMGR_RSYSLOG_PATH")
+
+	echo "
+Wazuh Netmanager status:
+Initialized = $initialized
+Enabled = $enabled
+Node count = $node_count
+
+Nodes:"
+grep -oE "# $NETMGR_MARKER_NODE-.+" "$NETMGR_RSYSLOG_PATH" | sed -E "s/# $NETMGR_MARKER_NODE-(.+)/\1/"
+
+echo ""
 }
 
 func_enable(){
