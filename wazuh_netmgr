@@ -162,8 +162,10 @@ func_reload(){
 	[ $VERBOSE -eq 1 ] && echo "Reloading rsyslog..."
 	systemctl restart rsyslog
 
-	[ $VERBOSE -eq 1 ] && echo "Reloading Wazuh..."
+	[ $VERBOSE -eq 1 ] && echo "Reloading Wazuh agent..."
 	systemctl restart wazuh-agent
+
+	[ $VERBOSE -eq 1 ] && echo "Reloading Wazuh manager..."
 	systemctl restart wazuh-manager
 
 	echo "Wazuh net reloaded."
@@ -225,11 +227,11 @@ if \$fromhost-ip startswith '$ip' then $path\\
 	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
 sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<ossec_config>/a \
 ""<!-- $NETMGR_MARKER_NODE-$ip -->\\
-<localfile>\\
-	<log_format>syslog</log_format>\\
-	<location>$path</location>\\
-	<out_format>$name: \$(log)<out_format>\\
-</localfile>\\
+  <localfile>\\
+    <log_format>syslog</log_format>\\
+    <location>$path</location>\\
+    <out_format>$name: \$(log)</out_format>\\
+  </localfile>\\
 ""
 }" "$WAZUH_CONF_PATH"
 
