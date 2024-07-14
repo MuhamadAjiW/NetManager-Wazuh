@@ -1,2 +1,2 @@
-wazuh_netmgr.conf
-wazuh_netmgr.data
+etc/wazuh_netmgr.conf
+data/wazuh_netmgr.data

@@ -1,0 +1,4 @@
+#!/bin/bash
+# command library for cisco routers, not for use outside of wazuh_netmgr
+
+

@@ -11,6 +11,13 @@ VERBOSE=0
 NETMGR_MARKER_MAIN="Wazuh_Netmgr"
 NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
 
+# Load Libraries
+for libfile in ./lib/*; do
+    if [ -r "$libfile" ] && [ -f "$libfile" ]; then
+        source "$libfile"
+    fi
+done
+
 # Internal functions
 validate_ip() {
     [ $VERBOSE -eq 1 ] && echo "Validating ip..."
@@ -414,7 +421,7 @@ func_unregister(){
 }
 
 main(){
-	local config="./wazuh_netmgr.conf"
+	local config="./etc/wazuh_netmgr.conf"
 	local action=""
 
 	# Set opt index
