@@ -8,8 +8,8 @@ fi
 
 # Global Variables
 VERBOSE=0
-RSYSLOG_MARKER_MAIN="Wazuh_Netmgr"
-RSYSLOG_MARKER_NODE="Wazuh_Netmgr_Node"
+NETMGR_MARKER_MAIN="Wazuh_Netmgr"
+NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
 
 # Internal functions
 validate_ip() {
@@ -28,7 +28,7 @@ validate_ip() {
 }
 
 validate_init(){
-	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$RSYSLOG_MARKER_MAIN>" "$WAZUH_NETMGR_RSYSLOG_PATH" && return 0 || return 1
+	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && grep -Eq "^[ ]*#[ ]*<$NETMGR_MARKER_MAIN>" "$WAZUH_NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
 
@@ -38,7 +38,7 @@ func_show_help(){
 Usage: $0 [-v] [-c config]
 Commands:
 	init			Initializes Wazuh Netmanager environment
-	reset			Clears Wazuh Netmanager node and configurations
+	reset			Uninitialize Wazuh Netmanager node and configurations
 	reload			Reloads rsyslog and Wazuh Server (Agent or Manager)
 	status			Shows information of Wazuh Netmanager (Not wazuh itself)
 	enable			Enables wazuh net logging
@@ -67,20 +67,20 @@ func_init(){
 
 		{
 		echo "# Configurations for Wazuh Netmanager, DO NOT MODIFY MANUALLY"
-		echo "# <$RSYSLOG_MARKER_MAIN>"
+		echo "# <$NETMGR_MARKER_MAIN>"
 		echo '# $ModLoad imudp'
 		echo '# $UDPServerRun 514'
 		echo ''
-		echo "# <$RSYSLOG_MARKER_NODE>"
+		echo "# <$NETMGR_MARKER_NODE>"
 		} > "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
 		{
 		echo ""
-		echo "<!-- $RSYSLOG_MARKER_MAIN -->"
+		echo "<!-- $NETMGR_MARKER_MAIN -->"
 		echo "<ossec_config>"
 		echo "</ossec_config>"
-		echo "<!-- /$RSYSLOG_MARKER_MAIN -->"
+		echo "<!-- /$NETMGR_MARKER_MAIN -->"
 		} >> "$WAZUH_CONF_PATH"
 
 		echo "Wazuh Netmanager setup complete."
@@ -94,7 +94,7 @@ func_reset(){
 	[ -f "$WAZUH_NETMGR_RSYSLOG_PATH" ] && rm $WAZUH_NETMGR_RSYSLOG_PATH
 
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager ossec configs..."
-	sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->/,/<!-- \/$RSYSLOG_MARKER_MAIN -->/d" "$WAZUH_CONF_PATH"
+	sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/d" "$WAZUH_CONF_PATH"
 	
 	echo "Wazuh Netmanager has been reset. Use \"wazuh_netmgr reload\" for it to take effect."
 }
@@ -208,7 +208,7 @@ name: $name
 "
 
 	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
-	sed -i "/# <$RSYSLOG_MARKER_NODE>/a# $RSYSLOG_MARKER_NODE-$ip\\
+	sed -i "/# <$NETMGR_MARKER_NODE>/a# $NETMGR_MARKER_NODE-$ip\\
 if \$fromhost-ip startswith '$ip' then $path\\
 & ~" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
@@ -223,8 +223,8 @@ if \$fromhost-ip startswith '$ip' then $path\\
 	chown syslog:adm $path
 
 	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
-sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->/,/<!-- \/$RSYSLOG_MARKER_MAIN -->/ { /<ossec_config>/a \
-""<!-- $RSYSLOG_MARKER_NODE-$ip -->\\
+sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<ossec_config>/a \
+""<!-- $NETMGR_MARKER_NODE-$ip -->\\
 <localfile>\\
 	<log_format>syslog</log_format>\\
 	<location>$path</location>\\
@@ -268,7 +268,7 @@ func_unregister(){
 	[ -f "$path" ] && rm "$path"
 	
 	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
-	sed -i "/<!-- $RSYSLOG_MARKER_NODE-$ip -->/,/<\/localfile>/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
+	sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<\/localfile>/d" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
 	echo "Node has been removed. Use \"wazuh_netmgr reload\" for it to take effect."
 }
