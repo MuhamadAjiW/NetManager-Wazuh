@@ -319,6 +319,9 @@ func_init(){
 func_reset(){
 	[ $VERBOSE -eq 1 ] && echo "Resetting Wazuh..."
 
+	[ $VERBOSE -eq 1 ] && echo "Setting off all network appliances logging..."
+	netmgr_unregister_file "$NETMGR_DATA_PATH"
+
 	[ $VERBOSE -eq 1 ] && echo "Deleting Wazuh Netmanager rsyslog configs..."
 	[ -f "$NETMGR_RSYSLOG_PATH" ] && rm $NETMGR_RSYSLOG_PATH
 
