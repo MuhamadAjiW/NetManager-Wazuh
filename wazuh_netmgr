@@ -76,6 +76,7 @@ func_init(){
 
 		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
 		{
+		echo ""
 		echo "<!-- $RSYSLOG_MARKER_MAIN -->"
 		echo "<ossec_config>"
 		echo "</ossec_config>"
@@ -211,21 +212,26 @@ name: $name
 if \$fromhost-ip startswith '$ip' then $path\\
 & ~" "$WAZUH_NETMGR_RSYSLOG_PATH"
 
-	[ $VERBOSE -eq 1 ] echo "Creating file in given path..."
+	[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
+	local dir=$(dirname "$path")
+	mkdir -p "$dir"
+
+	[ $VERBOSE -eq 1 ] && echo "Creating file in given path..."
 	touch $path
 
 	[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
 	chown syslog:adm $path
 
 	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
-sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->\\
-<ossec_config>/a<!-- $RSYSLOG_MARKER_NODE-$ip -->\\
+sed -i "/<!-- $RSYSLOG_MARKER_MAIN -->/,/<!-- \/$RSYSLOG_MARKER_MAIN -->/ { /<ossec_config>/a \
+""<!-- $RSYSLOG_MARKER_NODE-$ip -->\\
 <localfile>\\
 	<log_format>syslog</log_format>\\
 	<location>$path</location>\\
-	<out_format>$name: \$(log)</out_format>\\
+	<out_format>$name: \$(log)<out_format>\\
 </localfile>\\
-" "$WAZUH_CONF_PATH"
+""
+}" "$WAZUH_CONF_PATH"
 
 	echo "Node has been added. Use \"wazuh_netmgr reload\" for it to take effect."	
 }
