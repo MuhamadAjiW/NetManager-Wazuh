@@ -134,10 +134,10 @@ netmgr_unregister_node(){
 		echo "Error: ip address is required"
 		return 1
 	elif ! validate_ip "$ip"; then
-		echo "Error: Invalid ip address argument"
+		echo "Error: ip address $ip is invalid"
 		return 1
 	elif ! validate_node_exist "$ip"; then
-		echo "Node has already been unregistered"
+		echo "Node $ip has already been unregistered"
 		return 0
 	fi
 
@@ -360,11 +360,11 @@ func_register(){
 			exit 1
 		fi
 		netmgr_register_file "$file"
-		exit $?
+		[ $? -ne 0 ] && exit $?
 
 	elif [ ! -z "$ip" ] && [ ! -z "$path" ] && [ ! -z "$name" ]; then
 		netmgr_register_node "$path" "$ip" "$name"
-		exit $?
+		[ $? -ne 0 ] && exit $?
 
 	else
 		echo "Error: Missing required arguments. Use -h for help."
