@@ -48,6 +48,133 @@ validate_node_exist(){
 	grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
+netmgr_register_node(){
+	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh with path=$1 ip=$2 name=$3..."
+	local path=$1
+	local ip=$2
+	local name=$3
+
+	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
+		echo "Error: ip address, path, and a name is required"
+		return 1
+	elif ! validate_ip "$ip"; then
+		echo "Error: ip address $ip is invalid"
+		return 1
+	elif validate_node_exist "$ip"; then
+		echo "Node $ip has already been registered"
+		return 0
+	fi
+
+	path="$NETMGR_LOG_PATH/$path"
+
+	[ $VERBOSE -eq 1 ] && echo "
+Adding node:
+ip: $ip
+path: $path
+name: $name
+"
+
+	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
+	sed -i "/# <$NETMGR_MARKER_NODE>/a# $NETMGR_MARKER_NODE-$ip\\
+if \$fromhost-ip startswith '$ip' then $path\\
+& ~\\
+# /$NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH"
+
+	[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
+	local dir=$(dirname "$path")
+	mkdir -p "$dir"
+
+	[ $VERBOSE -eq 1 ] && echo "Creating file in given path..."
+	touch $path
+
+	[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
+	chown syslog:adm $path
+
+	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
+sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<ossec_config>/a \
+""<!-- $NETMGR_MARKER_NODE-$ip -->\\
+  <localfile>\\
+    <log_format>syslog</log_format>\\
+    <location>$path</location>\\
+    <out_format>$name: \$(log)</out_format>\\
+  </localfile>\\
+<!-- /$NETMGR_MARKER_NODE-$ip -->""
+}" "$WAZUH_CONF_PATH"
+
+	echo "Node $ip has been added."
+}
+
+netmgr_register_file(){
+	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh with file=$1..."
+	local file=$1
+	local path=""
+	local ip=""
+	local name=""
+
+	if [ ! -f "$file" ]; then
+		echo "Error: Input file not found or is not a regular file."
+		return 1
+	fi
+
+	while IFS=';' read -r path ip name; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		netmgr_register_node "$path" "$ip" "$name" 
+	done < "$file"
+
+	echo "Nodes from $file has been added."
+}
+
+netmgr_unregister_node(){
+	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh with ip=$1..."
+	local ip=$1
+
+	if [ -z "$ip" ]; then
+		echo "Error: ip address is required"
+		return 1
+	elif ! validate_ip "$ip"; then
+		echo "Error: Invalid ip address argument"
+		return 1
+	elif ! validate_node_exist "$ip"; then
+		echo "Node has already been unregistered"
+		return 0
+	fi
+
+	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
+	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$NETMGR_RSYSLOG_PATH"
+
+	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
+	[ -f "$path" ] && rm "$path"
+	
+	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
+	sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/d" "$WAZUH_CONF_PATH"
+
+	echo "Node $ip has been removed."
+}
+
+netmgr_unregister_file(){
+	[ $VERBOSE -eq 1 ] && echo "Removing node from Wazuh with file=$1..."
+	local file=$1
+	local path=""
+	local ip=""
+	local name=""
+
+	if [ ! -f "$file" ]; then
+		echo "Error: Input file not found or is not a regular file."
+		return 1
+	fi
+
+	while IFS=';' read -r path ip name; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		netmgr_unregister_node "$ip" 
+	done < "$file"
+
+	echo "Nodes from $file has been removed."
+}
+
 
 # Commands
 func_show_help(){
@@ -93,7 +220,6 @@ func_init(){
 
 		[ $VERBOSE -eq 1 ] && echo "Setting up ossec configs..."
 		{
-		echo ""
 		echo "<!-- $NETMGR_MARKER_MAIN -->"
 		echo "<ossec_config>"
 		echo "</ossec_config>"
@@ -214,66 +340,38 @@ func_register(){
 	local path=""
 	local ip=""
 	local name=""
+	local file=""
 
-	while getopts "h?p:i:n:" opt; do
+	while getopts "h?p:i:n:f:" opt; do
 		case "$opt" in
 		h|\?)
-			echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name]" && exit 0;;
+			echo "Usage: wazuh_netmgr register [-p log path] [-i ip address] [-n name] or [-f file path]" && exit 0;;
 		p)	path=$OPTARG	;;
 		i)	ip=$OPTARG		;;
 		n)	name=$OPTARG	;;
+		f)	file=$OPTARG	;;
 		esac
 	done
 	shift $((OPTIND-1))
 
-	if [ -z "$ip" ] || [ -z "$path" ] || [ -z "$name" ]; then
-		echo "Error: ip address, path, and a name is required"
-		exit 1
-	elif ! validate_ip "$ip"; then
-		echo "Error: Invalid ip address argument"
-		exit 1
-	elif validate_node_exist "$ip"; then
-		echo "Error: Node already registered"
+	if [ ! -z "$file" ]; then
+		if [ ! -z "$ip" ] || [ ! -z "$path" ] || [ ! -z "$name" ]; then
+			echo "Error: -f flag cannot be used at the same time with singular entry flags"
+			exit 1
+		fi
+		netmgr_register_file "$file"
+		exit $?
+
+	elif [ ! -z "$ip" ] && [ ! -z "$path" ] && [ ! -z "$name" ]; then
+		netmgr_register_node "$path" "$ip" "$name"
+		exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
 		exit 1
 	fi
 
-	path="$NETMGR_LOG_PATH/$path"
-
-	[ $VERBOSE -eq 1 ] && echo "
-Adding node:
-ip: $ip
-path: $path
-name: $name
-"
-
-	[ $VERBOSE -eq 1 ] && echo "Adding rsyslog configuration..."
-	sed -i "/# <$NETMGR_MARKER_NODE>/a# $NETMGR_MARKER_NODE-$ip\\
-if \$fromhost-ip startswith '$ip' then $path\\
-& ~\\
-# /$NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH"
-
-	[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
-	local dir=$(dirname "$path")
-	mkdir -p "$dir"
-
-	[ $VERBOSE -eq 1 ] && echo "Creating file in given path..."
-	touch $path
-
-	[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
-	chown syslog:adm $path
-
-	[ $VERBOSE -eq 1 ] && echo "Adding ossec configuration..."
-sed -i "/<!-- $NETMGR_MARKER_MAIN -->/,/<!-- \/$NETMGR_MARKER_MAIN -->/ { /<ossec_config>/a \
-""<!-- $NETMGR_MARKER_NODE-$ip -->\\
-  <localfile>\\
-    <log_format>syslog</log_format>\\
-    <location>$path</location>\\
-    <out_format>$name: \$(log)</out_format>\\
-  </localfile>\\
-<!-- /$NETMGR_MARKER_NODE-$ip -->""
-}" "$WAZUH_CONF_PATH"
-
-	echo "Node has been added. Use \"wazuh_netmgr reload\" for it to take effect."	
+	echo "Registration complete. Use \"wazuh_netmgr reload\" for it to take effect."
 }
 
 func_unregister(){
@@ -283,39 +381,37 @@ func_unregister(){
 	OPTIND=2
 
 	local ip=""
+	local file=""
 
-	while getopts "h?i:" opt; do
+	while getopts "h?i:f:" opt; do
 		case "$opt" in
 		h|\?)
 			echo "Usage: wazuh_netmgr unregister [-i ip address]" && exit 0;;
 		i)	ip=$OPTARG		;;
+		f)	file=$OPTARG	;;
 		esac
 	done
 	shift $((OPTIND-1))
 
-	if [ -z "$ip" ]; then
-		echo "Error: ip address is required"
-		exit 1
-	elif ! validate_ip "$ip"; then
-		echo "Error: Invalid ip address argument"
-		exit 1
-	elif ! validate_node_exist "$ip"; then
-		echo "Error: Node is not registered"
+	if [ ! -z "$file" ]; then
+		if [ ! -z "$ip" ]; then
+			echo "Error: -f flag cannot be used at the same time with singular entry flags"
+			exit 1
+		fi
+		netmgr_unregister_file "$file"
+		[ $? -ne 0 ] && exit $?
+
+	elif [ ! -z "$ip" ]; then
+		netmgr_unregister_node "$ip"
+		[ $? -ne 0 ] && exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
 		exit 1
 	fi
 
-	[ $VERBOSE -eq 1 ] && echo "Removing node from rsyslog configuration..."
-	sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip /d" "$NETMGR_RSYSLOG_PATH"
-
-	[ $VERBOSE -eq 1 ] && echo "Deleting node log file..."
-	[ -f "$path" ] && rm "$path"
-	
-	[ $VERBOSE -eq 1 ] && echo "Removing node from ossec configuration..."
-	sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/d" "$WAZUH_CONF_PATH"
-
-	echo "Node has been removed. Use \"wazuh_netmgr reload\" for it to take effect."
+	echo "Unregistration complete. Use \"wazuh_netmgr reload\" for it to take effect."
 }
-
 
 main(){
 	local config="./wazuh_netmgr.conf"
