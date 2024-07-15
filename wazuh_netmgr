@@ -48,6 +48,42 @@ validate_node_exist(){
 	grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
 }
 
+netmgr_clean_node(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning node with ip=$1..."
+	local ip=$1
+	local fullpath=""
+
+	grep -oE ".*;$ip;.*" "$NETMGR_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		fullpath="$NETMGR_LOG_PATH/$path"
+		[ $VERBOSE -eq 1 ] && echo "Node log path is $fullpath."
+
+		echo "" > "$fullpath"
+		[ $VERBOSE -eq 1 ] && echo "Node cleaned."
+
+	done
+}
+
+netmgr_clean_file(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning logs with file=$1..."
+	local file=$1
+	local fullpath=""
+
+	while IFS=';' read -r path ip name library method username password; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		fullpath="$NETMGR_LOG_PATH/$path"
+		[ $VERBOSE -eq 1 ] && echo "Node log path is $fullpath."
+
+		echo "" > "$fullpath"
+		[ $VERBOSE -eq 1 ] && echo "Node cleaned."
+
+	done < "$file"
+}
+
 netmgr_register_node(){
 	[ $VERBOSE -eq 1 ] && echo "Adding node to Wazuh with path=$1 ip=$2 name=$3..."
 	local path=$1
@@ -256,6 +292,7 @@ Commands:
 	init            Initializes Wazuh Netmanager environment
 	reset           Uninitialize Wazuh Netmanager node and configurations
 	reload          Reloads rsyslog and Wazuh Server (Agent or Manager)
+	clean           Clean log files of a node
 	status          Shows information of Wazuh Netmanager (Not wazuh itself)
 	enable          Enables wazuh net logging
 	disable         Disables wazuh net logging
@@ -325,6 +362,62 @@ func_reset(){
 	[ -f "$NETMGR_DATA_PATH" ] && rm "$NETMGR_DATA_PATH"
 
 	echo "Wazuh Netmanager has been reset. Use \"wazuh_netmgr reload\" for it to take effect."
+}
+
+func_clean(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning node log files..."
+
+	# Set opt index
+	OPTIND=2
+
+	local ip=""
+	local file=""
+	local all=0
+
+	while getopts "h?ai:f:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "
+Usage: wazuh_netmgr register [-i ip address] or [-f file path] or [-a]
+
+Mandatory:
+	-i <ip address>     : The ip address of the added node
+	-f <file path>      : The path for bulk removing logs
+	-a                  : Cleans all log file
+
+Example file format at ./data/wazuh_netmgr.data.example
+" && exit 0;;
+		a)	all=1				;;
+		i)	ip=$OPTARG			;;
+		f)	file=$OPTARG		;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $all -ne 0 ]; then
+		if [ ! -z $file ] || [ ! -z $ip ]; then
+			echo "Error: -a flag cannot be used at the same time with file or single entry flag"
+			exit 1
+		fi
+		netmgr_clean_file "$NETMGR_DATA_PATH"
+	elif [ ! -z "$file" ]; then
+		if [ ! -z "$ip" ]; then 
+			echo "Error: -f flag cannot be used at the same time with singular entry flag"
+			exit 1
+		fi
+		netmgr_clean_file "$file"
+		[ $? -ne 0 ] && exit $?
+
+	elif [ ! -z "$ip" ]; then 
+		netmgr_clean_node "$ip"
+		[ $? -ne 0 ] && exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
+		exit 1
+	fi
+
+	echo "Log cleaning complete."
 }
 
 func_status(){
@@ -452,10 +545,11 @@ Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f f
 Mandatory:
 	-o <output path>    : Specifies the path for incoming logs
 	-i <ip address>     : The ip address of the added node
-	-n <name>           : Name of the added node
-	
-	or (example file format at ./data/wazuh_netmgr.data.example)
+	-n <name>           : Name of the added node	
+	or
 	-f <file path>      : The path for bulk adding nodes
+
+Example file format at ./data/wazuh_netmgr.data.example
 
 Optional:
 	-l <library>        : Library used for configuring the network appliance (default is none)
@@ -596,6 +690,7 @@ main(){
 	"disable")		func_disable			;;
 	"register")	 	func_register "$@"		;;
 	"unregister")   func_unregister "$@"	;;
+	"clean")		func_clean "$@"			;;
 	*)				func_show_help			;;
 	esac
 }
