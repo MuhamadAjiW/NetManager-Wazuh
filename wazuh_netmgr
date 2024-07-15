@@ -53,7 +53,7 @@ netmgr_clean_node(){
 	local ip=$1
 	local fullpath=""
 
-	grep -oE ".*;$ip;.*" "$NETMGR_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
+	grep ";$ip;" "$NETMGR_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
 		if [[ -z "$path" || "$path" == "#"* ]]; then
 			continue
 		fi
@@ -82,6 +82,71 @@ netmgr_clean_file(){
 		[ $VERBOSE -eq 1 ] && echo "Node cleaned."
 
 	done < "$file"
+}
+
+netmgr_edit_node(){
+	[ $VERBOSE -eq 1 ] && echo "Editing node to Wazuh with ip=$2..."
+	local path=$1
+	local ip=$2
+	local name=$3
+	local library=$4
+	local method=$5
+	local username=$6
+	local password=$7
+	local fullpath="$NETMGR_LOG_PATH/$path"
+	local libpath="$NETMGR_LIB_PATH/$library"
+	local line=$(grep ";$ip;" "$NETMGR_DATA_PATH")	
+	local newline=""
+	
+	[ $VERBOSE -eq 1 ] && echo "Initial line is [$line]"
+	[ $VERBOSE -eq 1 ] && echo "Validating inputs..."
+	if ! validate_ip "$ip"; then
+		echo "Error: ip address $ip is invalid."
+		return 1
+	elif [ -z "$line" ]; then
+		echo "Error: ip address $ip is unregistered."
+		return 1
+	elif [ ! -z "$library" ] && [ ! -f $libpath ]; then
+		echo "Error: Library $libpath does not exist."
+		return 1
+	elif [ ! -z "$method" ]; then
+		case "$method" in
+		none)
+			username="none"
+			password="none"
+			;;
+		password)
+			;;
+		*)
+			echo "Error: Method $method is invalid or not available."
+			return 1
+			;;
+		esac
+	fi
+
+	IFS=';' read -r file_path file_ip file_name file_library file_method file_username file_password <<< "$line"
+
+	file_path=${path:-$file_path}
+	file_name=${name:-$file_name}
+	file_library=${library:-$file_library}
+	file_method=${method:-$file_method}
+	file_username=${username:-$file_username}
+	file_password=${password:-$file_password}
+
+	newline="$file_path;$ip;$file_name;$file_library;$file_method;$file_username;$file_password"
+	[ $VERBOSE -eq 1 ] && echo "New line is [$newline]"
+
+	sed -i "s|.*;$ip;.*|$newline|" "$NETMGR_DATA_PATH"
+
+	if [ ! -z "$path" ]; then
+		[ $VERBOSE -eq 1 ] && echo "Editing path..."
+
+	fi
+
+	if [ ! -z "$name" ]; then
+		[ $VERBOSE -eq 1 ] && echo "Editing name..."
+
+	fi
 }
 
 netmgr_register_node(){
@@ -648,6 +713,66 @@ func_unregister(){
 	echo "Unregistration complete. Use \"wazuh_netmgr reload\" for it to take effect."
 }
 
+func_edit(){
+	[ $VERBOSE -eq 1 ] && echo "Editing node..."
+
+	# Set opt index
+	OPTIND=2
+
+	local path=""
+	local ip=""
+	local name=""
+	local file=""
+	local library=""
+	local method=""
+	local username=""
+	local password=""
+
+	while getopts "h?o:i:n:l:m:u:p:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "
+Usage: wazuh_netmgr edit [-i ip address]
+
+Mandatory:
+	-i <ip address>     : The ip address of the added node
+
+Optional:
+	-o <output path>    : Specifies the path for incoming logs
+	-n <name>           : Name of the added node	
+	-l <library>        : Library used for configuring the network appliance (default is none)
+	-m <method>         : Authentication method
+	-u <username>       : Username for password authentication
+	-p <password>       : Password for password authentication
+
+Authentication Methods:
+	none                : Does not configure the network appliance (default)
+	password            : Uses username and password
+" && exit 0;;
+		o)	path=$OPTARG		;;
+		i)	ip=$OPTARG			;;
+		n)	name=$OPTARG		;;
+		l)	library=$OPTARG		;;
+		m)	method=$OPTARG		;;
+		u)	username=$OPTARG	;;
+		p)	password=$OPTARG	;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ! -z "$ip" ]; then
+		netmgr_edit_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
+		[ $? -ne 0 ] && exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
+		exit 1
+	fi
+
+	echo "Edit complete. Use \"wazuh_netmgr reload\" for it to take effect."
+}
+
+# main
 main(){
 	local config="./etc/wazuh_netmgr.conf"
 	local action=""
@@ -691,6 +816,7 @@ main(){
 	"register")	 	func_register "$@"		;;
 	"unregister")   func_unregister "$@"	;;
 	"clean")		func_clean "$@"			;;
+	"edit")			func_edit "$@"			;;
 	*)				func_show_help			;;
 	esac
 }
