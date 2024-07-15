@@ -3,7 +3,7 @@ Wazuh Netmanager - License
 Copyright (C) 2024, Muhamad Aji Wibisono.
 Designed on work Copyright (C) 2015, Wazuh Inc.
 
-This library is designed to work with Wazuh, which is licensed under the GNU General Public License (GPL) Version 2. Certain portions of this library allow linking with the OpenSSL library under specific conditions, as described in individual source files.
+This library is designed to work with Wazuh, which is licensed under the GNU General Public License (GPL) Version 2.
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License (Version 2) as published by the FSF - Free Software Foundation.
 
