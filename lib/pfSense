@@ -1,5 +1,5 @@
 #!/bin/bash
-# command library for cisco, do not use outside of wazuh_netmgr
+# command library for pfsense, do not use outside of wazuh_netmgr
 
 lib_execute_command(){
 	[ $VERBOSE -eq 1 ] && echo "Executing command on ssh..."
@@ -38,22 +38,15 @@ lib_register_password(){
 	local username=$2
 	local password=$3	
 	local retcode=0
-    local commands="
-enable
-conf t
-logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
+    local commands=""
 
-    echo "Registering Cisco-vIOS with ip: $ip..."
+    echo "Registering pfSense with ip: $ip..."
     [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
 
 	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
 
 	retcode=$?
-    [ $retcode -eq 0 ] && echo "Cisco-vIOS registration success" || echo "Cisco-vIOS registration failed"
+    [ $retcode -eq 0 ] && echo "pfSense registration success" || echo "pfSense registration failed"
 	return $retcode
 }
 
@@ -62,22 +55,15 @@ lib_unregister_password(){
 	local username=$2
 	local password=$3
 	local retcode=0
-    local commands="
-enable
-conf t
-no logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
+    local commands=""
 
-    echo "Unregistering Cisco-vIOS with ip: $ip..."
+    echo "Unregistering pfSense with ip: $ip..."
     [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
 
 	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
 
 	retcode=$?
-    [ $retcode -eq 0 ] && echo "Cisco-vIOS unregistration success" || echo "Cisco-vIOS unregistration failed"
+    [ $retcode -eq 0 ] && echo "pfSense unregistration success" || echo "pfSense unregistration failed"
 	return $retcode
 }
 

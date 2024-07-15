@@ -1,5 +1,5 @@
 #!/bin/bash
-# Template for command library, do not use
+# command library for <appliance>, do not use outside of wazuh_netmgr
 
 lib_execute_command(){
 	# TODO: Adjust command and logging
