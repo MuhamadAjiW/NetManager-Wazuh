@@ -96,8 +96,8 @@ netmgr_edit_node(){
 	local fullpath="$NETMGR_LOG_PATH/$path"
 	local libpath="$NETMGR_LIB_PATH/$library"
 	local line=$(grep ";$ip;" "$NETMGR_DATA_PATH")	
-	local newline=""
-	
+	local newline=""	
+
 	[ $VERBOSE -eq 1 ] && echo "Initial line is [$line]"
 	[ $VERBOSE -eq 1 ] && echo "Validating inputs..."
 	if ! validate_ip "$ip"; then
@@ -122,10 +122,15 @@ netmgr_edit_node(){
 			return 1
 			;;
 		esac
+	elif [ -z "$path" ] && [ -z "$name" ] && [ -z "$library" ] && [ -z "$method" ] && [ -z "$username" ] && [ -z "$password" ]; then
+		echo "Error: No change argument given"
+		return 1
 	fi
 
 	IFS=';' read -r file_path file_ip file_name file_library file_method file_username file_password <<< "$line"
 
+	local old_fullpath="$NETMGR_LOG_PATH/$file_path"
+	local old_name="$file_name"
 	file_path=${path:-$file_path}
 	file_name=${name:-$file_name}
 	file_library=${library:-$file_library}
@@ -139,13 +144,29 @@ netmgr_edit_node(){
 	sed -i "s|.*;$ip;.*|$newline|" "$NETMGR_DATA_PATH"
 
 	if [ ! -z "$path" ]; then
-		[ $VERBOSE -eq 1 ] && echo "Editing path..."
+		[ $VERBOSE -eq 1 ] && echo "Editing path at rsyslog..."
+		sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip/ s|if \$fromhost-ip startswith '$ip' then $old_fullpath|if \$fromhost-ip startswith '$ip' then $fullpath|" "$NETMGR_RSYSLOG_PATH"
 
+		[ $VERBOSE -eq 1 ] && echo "Editing path at ossec..."
+		sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/ s|<location>$old_fullpath</location>|<location>$fullpath</location>|" "$WAZUH_CONF_PATH"
+
+		[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
+		local dir=$(dirname "$fullpath")
+		mkdir -p "$dir"
+
+		[ $VERBOSE -eq 1 ] && echo "Creating file in given path..."
+		touch $fullpath
+
+		[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
+		chown syslog:adm $fullpath
+
+		[ $VERBOSE -eq 1 ] && echo "Path edited."
 	fi
 
-	if [ ! -z "$name" ]; then
+	if [ ! -z "$name" ] ; then
 		[ $VERBOSE -eq 1 ] && echo "Editing name..."
-
+		sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/ s|<out_format>$old_name: \$(log)<\/out_format>|<out_format>$file_name: \$(log)<\/out_format>|" "$WAZUH_CONF_PATH"
+		[ $VERBOSE -eq 1 ] && echo "Name edited."
 	fi
 }
 
@@ -445,7 +466,7 @@ func_clean(){
 			echo "
 Usage: wazuh_netmgr register [-i ip address] or [-f file path] or [-a]
 
-Mandatory:
+Required:
 	-i <ip address>     : The ip address of the added node
 	-f <file path>      : The path for bulk removing logs
 	-a                  : Cleans all log file
@@ -607,7 +628,7 @@ func_register(){
 			echo "
 Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f file path]
 
-Mandatory:
+Required:
 	-o <output path>    : Specifies the path for incoming logs
 	-i <ip address>     : The ip address of the added node
 	-n <name>           : Name of the added node	
@@ -734,7 +755,7 @@ func_edit(){
 			echo "
 Usage: wazuh_netmgr edit [-i ip address]
 
-Mandatory:
+Required:
 	-i <ip address>     : The ip address of the added node
 
 Optional:
@@ -748,6 +769,9 @@ Optional:
 Authentication Methods:
 	none                : Does not configure the network appliance (default)
 	password            : Uses username and password
+
+Note:
+	Changing path will not remove or move old logs to the new file
 " && exit 0;;
 		o)	path=$OPTARG		;;
 		i)	ip=$OPTARG			;;
