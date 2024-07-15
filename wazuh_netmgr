@@ -7,16 +7,9 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Global Variables
-VERBOSE=0
+VERBOSE=1
 NETMGR_MARKER_MAIN="Wazuh_Netmgr"
 NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
-
-# Load Libraries
-for libfile in ./lib/*; do
-    if [ -r "$libfile" ] && [ -f "$libfile" ]; then
-        source "$libfile"
-    fi
-done
 
 # Internal functions
 validate_ip() {
@@ -258,21 +251,21 @@ netmgr_unregister_file(){
 # Commands
 func_show_help(){
 	echo "
-Usage: $0 [-v] [-c config]
+Usage: $0 [-s] [-c config]
 Commands:
-	init			Initializes Wazuh Netmanager environment
-	reset			Uninitialize Wazuh Netmanager node and configurations
-	reload			Reloads rsyslog and Wazuh Server (Agent or Manager)
-	status			Shows information of Wazuh Netmanager (Not wazuh itself)
-	enable			Enables wazuh net logging
-	disable			Disables wazuh net logging
-	register		Registers a network node in wazuh
-	unregister		Unregisters a network node in wazuh
+	init            Initializes Wazuh Netmanager environment
+	reset           Uninitialize Wazuh Netmanager node and configurations
+	reload          Reloads rsyslog and Wazuh Server (Agent or Manager)
+	status          Shows information of Wazuh Netmanager (Not wazuh itself)
+	enable          Enables wazuh net logging
+	disable         Disables wazuh net logging
+	register        Registers a network node in wazuh
+	unregister      Unregisters a network node in wazuh
 
 Options:
-	-h				Shows this help message
-	-c <config>		Specifies configuration file
-	-v				Enable Verbose mode
+	-h              Shows this help message
+	-c <config>     Specifies configuration file
+	-s              Enable silent mode
 
 
 Note:
@@ -457,22 +450,22 @@ func_register(){
 Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f file path]
 
 Mandatory:
-	-o <output path>	: Specifies the path for incoming logs
-	-i <ip address>		: The ip address of the added node
-	-n <name>			: Name of the added node
+	-o <output path>    : Specifies the path for incoming logs
+	-i <ip address>     : The ip address of the added node
+	-n <name>           : Name of the added node
 	
 	or (example file format at ./data/wazuh_netmgr.data.example)
-	-f <file path>		: The path for bulk adding nodes
+	-f <file path>      : The path for bulk adding nodes
 
 Optional:
-	-l <library>		: Library used for configuring the network appliance (default is none)
-	-m <method>			: Authentication method
-	-u <username>		: Username for password authentication
-	-p <password>		: Password for password authentication
+	-l <library>        : Library used for configuring the network appliance (default is none)
+	-m <method>         : Authentication method
+	-u <username>       : Username for password authentication
+	-p <password>       : Password for password authentication
 
 Authentication Methods:
-	none				: Does not configure the network appliance (default)
-	password			: Uses username and password
+	none                : Does not configure the network appliance (default)
+	password            : Uses username and password
 " && exit 0;;
 		o)	path=$OPTARG		;;
 		i)	ip=$OPTARG			;;
@@ -568,10 +561,10 @@ main(){
 	# Set opt index
 	OPTIND=1
 
-	while getopts "h?vc:" opt; do
+	while getopts "h?sc:" opt; do
 		case "$opt" in
 		h|\?)	func_show_help && exit 0	;;
-		v)		VERBOSE=1					;;
+		s)		VERBOSE=0					;;
 		c)		config=$OPTARG				;;
 		esac
 	done
