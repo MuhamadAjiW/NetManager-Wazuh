@@ -7,16 +7,9 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Global Variables
-VERBOSE=0
+VERBOSE=1
 NETMGR_MARKER_MAIN="Wazuh_Netmgr"
 NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
-
-# Load Libraries
-for libfile in ./lib/*; do
-    if [ -r "$libfile" ] && [ -f "$libfile" ]; then
-        source "$libfile"
-    fi
-done
 
 # Internal functions
 validate_ip() {
@@ -53,6 +46,128 @@ validate_node_exist(){
 
 	local ip=$1
 	grep -Eq "# $NETMGR_MARKER_NODE-$ip" "$NETMGR_RSYSLOG_PATH" && return 0 || return 1
+}
+
+netmgr_clean_node(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning node with ip=$1..."
+	local ip=$1
+	local fullpath=""
+
+	grep ";$ip;" "$NETMGR_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		fullpath="$NETMGR_LOG_PATH/$path"
+		[ $VERBOSE -eq 1 ] && echo "Node log path is $fullpath."
+
+		echo "" > "$fullpath"
+		[ $VERBOSE -eq 1 ] && echo "Node cleaned."
+
+	done
+}
+
+netmgr_clean_file(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning logs with file=$1..."
+	local file=$1
+	local fullpath=""
+
+	while IFS=';' read -r path ip name library method username password; do
+		if [[ -z "$path" || "$path" == "#"* ]]; then
+			continue
+		fi
+		fullpath="$NETMGR_LOG_PATH/$path"
+		[ $VERBOSE -eq 1 ] && echo "Node log path is $fullpath."
+
+		echo "" > "$fullpath"
+		[ $VERBOSE -eq 1 ] && echo "Node cleaned."
+
+	done < "$file"
+}
+
+netmgr_edit_node(){
+	[ $VERBOSE -eq 1 ] && echo "Editing node to Wazuh with ip=$2..."
+	local path=$1
+	local ip=$2
+	local name=$3
+	local library=$4
+	local method=$5
+	local username=$6
+	local password=$7
+	local fullpath="$NETMGR_LOG_PATH/$path"
+	local libpath="$NETMGR_LIB_PATH/$library"
+	local line=$(grep ";$ip;" "$NETMGR_DATA_PATH")	
+	local newline=""	
+
+	[ $VERBOSE -eq 1 ] && echo "Initial line is [$line]"
+	[ $VERBOSE -eq 1 ] && echo "Validating inputs..."
+	if ! validate_ip "$ip"; then
+		echo "Error: ip address $ip is invalid."
+		return 1
+	elif [ -z "$line" ]; then
+		echo "Error: ip address $ip is unregistered."
+		return 1
+	elif [ ! -z "$library" ] && [ ! -f $libpath ]; then
+		echo "Error: Library $libpath does not exist."
+		return 1
+	elif [ ! -z "$method" ]; then
+		case "$method" in
+		none)
+			username="none"
+			password="none"
+			;;
+		password)
+			;;
+		*)
+			echo "Error: Method $method is invalid or not available."
+			return 1
+			;;
+		esac
+	elif [ -z "$path" ] && [ -z "$name" ] && [ -z "$library" ] && [ -z "$method" ] && [ -z "$username" ] && [ -z "$password" ]; then
+		echo "Error: No change argument given"
+		return 1
+	fi
+
+	IFS=';' read -r file_path file_ip file_name file_library file_method file_username file_password <<< "$line"
+
+	local old_fullpath="$NETMGR_LOG_PATH/$file_path"
+	local old_name="$file_name"
+	file_path=${path:-$file_path}
+	file_name=${name:-$file_name}
+	file_library=${library:-$file_library}
+	file_method=${method:-$file_method}
+	file_username=${username:-$file_username}
+	file_password=${password:-$file_password}
+
+	newline="$file_path;$ip;$file_name;$file_library;$file_method;$file_username;$file_password"
+	[ $VERBOSE -eq 1 ] && echo "New line is [$newline]"
+
+	sed -i "s|.*;$ip;.*|$newline|" "$NETMGR_DATA_PATH"
+
+	if [ ! -z "$path" ]; then
+		[ $VERBOSE -eq 1 ] && echo "Editing path at rsyslog..."
+		sed -i "/# $NETMGR_MARKER_NODE-$ip/,/# \/$NETMGR_MARKER_NODE-$ip/ s|if \$fromhost-ip startswith '$ip' then $old_fullpath|if \$fromhost-ip startswith '$ip' then $fullpath|" "$NETMGR_RSYSLOG_PATH"
+
+		[ $VERBOSE -eq 1 ] && echo "Editing path at ossec..."
+		sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/ s|<location>$old_fullpath</location>|<location>$fullpath</location>|" "$WAZUH_CONF_PATH"
+
+		[ $VERBOSE -eq 1 ] && echo "Creating folder in given path..."
+		local dir=$(dirname "$fullpath")
+		mkdir -p "$dir"
+
+		[ $VERBOSE -eq 1 ] && echo "Creating file in given path..."
+		touch $fullpath
+
+		[ $VERBOSE -eq 1 ] && echo "Changing file ownership..."
+		chown syslog:adm $fullpath
+
+		[ $VERBOSE -eq 1 ] && echo "Path edited."
+	fi
+
+	if [ ! -z "$name" ] ; then
+		[ $VERBOSE -eq 1 ] && echo "Editing name..."
+		sed -i "/<!-- $NETMGR_MARKER_NODE-$ip -->/,/<!-- \/$NETMGR_MARKER_NODE-$ip -->/ s|<out_format>$old_name: \$(log)<\/out_format>|<out_format>$file_name: \$(log)<\/out_format>|" "$WAZUH_CONF_PATH"
+		[ $VERBOSE -eq 1 ] && echo "Name edited."
+	fi
 }
 
 netmgr_register_node(){
@@ -258,21 +373,22 @@ netmgr_unregister_file(){
 # Commands
 func_show_help(){
 	echo "
-Usage: $0 [-v] [-c config]
+Usage: $0 [-s] [-c config]
 Commands:
-	init			Initializes Wazuh Netmanager environment
-	reset			Uninitialize Wazuh Netmanager node and configurations
-	reload			Reloads rsyslog and Wazuh Server (Agent or Manager)
-	status			Shows information of Wazuh Netmanager (Not wazuh itself)
-	enable			Enables wazuh net logging
-	disable			Disables wazuh net logging
-	register		Registers a network node in wazuh
-	unregister		Unregisters a network node in wazuh
+	init            Initializes Wazuh Netmanager environment
+	reset           Uninitialize Wazuh Netmanager node and configurations
+	reload          Reloads rsyslog and Wazuh Server (Agent or Manager)
+	clean           Clean log files of a node
+	status          Shows information of Wazuh Netmanager (Not wazuh itself)
+	enable          Enables wazuh net logging
+	disable         Disables wazuh net logging
+	register        Registers a network node in wazuh
+	unregister      Unregisters a network node in wazuh
 
 Options:
-	-h				Shows this help message
-	-c <config>		Specifies configuration file
-	-v				Enable Verbose mode
+	-h              Shows this help message
+	-c <config>     Specifies configuration file
+	-s              Enable silent mode
 
 
 Note:
@@ -332,6 +448,62 @@ func_reset(){
 	[ -f "$NETMGR_DATA_PATH" ] && rm "$NETMGR_DATA_PATH"
 
 	echo "Wazuh Netmanager has been reset. Use \"wazuh_netmgr reload\" for it to take effect."
+}
+
+func_clean(){
+	[ $VERBOSE -eq 1 ] && echo "Cleaning node log files..."
+
+	# Set opt index
+	OPTIND=2
+
+	local ip=""
+	local file=""
+	local all=0
+
+	while getopts "h?ai:f:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "
+Usage: wazuh_netmgr register [-i ip address] or [-f file path] or [-a]
+
+Required:
+	-i <ip address>     : The ip address of the added node
+	-f <file path>      : The path for bulk removing logs
+	-a                  : Cleans all log file
+
+Example file format at ./data/wazuh_netmgr.data.example
+" && exit 0;;
+		a)	all=1				;;
+		i)	ip=$OPTARG			;;
+		f)	file=$OPTARG		;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ $all -ne 0 ]; then
+		if [ ! -z $file ] || [ ! -z $ip ]; then
+			echo "Error: -a flag cannot be used at the same time with file or single entry flag"
+			exit 1
+		fi
+		netmgr_clean_file "$NETMGR_DATA_PATH"
+	elif [ ! -z "$file" ]; then
+		if [ ! -z "$ip" ]; then 
+			echo "Error: -f flag cannot be used at the same time with singular entry flag"
+			exit 1
+		fi
+		netmgr_clean_file "$file"
+		[ $? -ne 0 ] && exit $?
+
+	elif [ ! -z "$ip" ]; then 
+		netmgr_clean_node "$ip"
+		[ $? -ne 0 ] && exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
+		exit 1
+	fi
+
+	echo "Log cleaning complete."
 }
 
 func_status(){
@@ -456,23 +628,24 @@ func_register(){
 			echo "
 Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f file path]
 
-Mandatory:
-	-o <output path>	: Specifies the path for incoming logs
-	-i <ip address>		: The ip address of the added node
-	-n <name>			: Name of the added node
-	
-	or (example file format at ./data/wazuh_netmgr.data.example)
-	-f <file path>		: The path for bulk adding nodes
+Required:
+	-o <output path>    : Specifies the path for incoming logs
+	-i <ip address>     : The ip address of the added node
+	-n <name>           : Name of the added node	
+	or
+	-f <file path>      : The path for bulk adding nodes
+
+Example file format at ./data/wazuh_netmgr.data.example
 
 Optional:
-	-l <library>		: Library used for configuring the network appliance (default is none)
-	-m <method>			: Authentication method
-	-u <username>		: Username for password authentication
-	-p <password>		: Password for password authentication
+	-l <library>        : Library used for configuring the network appliance (default is none)
+	-m <method>         : Authentication method
+	-u <username>       : Username for password authentication
+	-p <password>       : Password for password authentication
 
 Authentication Methods:
-	none				: Does not configure the network appliance (default)
-	password			: Uses username and password
+	none                : Does not configure the network appliance (default)
+	password            : Uses username and password
 " && exit 0;;
 		o)	path=$OPTARG		;;
 		i)	ip=$OPTARG			;;
@@ -561,6 +734,69 @@ func_unregister(){
 	echo "Unregistration complete. Use \"wazuh_netmgr reload\" for it to take effect."
 }
 
+func_edit(){
+	[ $VERBOSE -eq 1 ] && echo "Editing node..."
+
+	# Set opt index
+	OPTIND=2
+
+	local path=""
+	local ip=""
+	local name=""
+	local file=""
+	local library=""
+	local method=""
+	local username=""
+	local password=""
+
+	while getopts "h?o:i:n:l:m:u:p:" opt; do
+		case "$opt" in
+		h|\?)
+			echo "
+Usage: wazuh_netmgr edit [-i ip address]
+
+Required:
+	-i <ip address>     : The ip address of the added node
+
+Optional:
+	-o <output path>    : Specifies the path for incoming logs
+	-n <name>           : Name of the added node	
+	-l <library>        : Library used for configuring the network appliance (default is none)
+	-m <method>         : Authentication method
+	-u <username>       : Username for password authentication
+	-p <password>       : Password for password authentication
+
+Authentication Methods:
+	none                : Does not configure the network appliance (default)
+	password            : Uses username and password
+
+Note:
+	Changing path will not remove or move old logs to the new file
+" && exit 0;;
+		o)	path=$OPTARG		;;
+		i)	ip=$OPTARG			;;
+		n)	name=$OPTARG		;;
+		l)	library=$OPTARG		;;
+		m)	method=$OPTARG		;;
+		u)	username=$OPTARG	;;
+		p)	password=$OPTARG	;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	if [ ! -z "$ip" ]; then
+		netmgr_edit_node "$path" "$ip" "$name" "$library" "$method" "$username" "$password"
+		[ $? -ne 0 ] && exit $?
+
+	else
+		echo "Error: Missing required arguments. Use -h for help."
+		exit 1
+	fi
+
+	echo "Edit complete. Use \"wazuh_netmgr reload\" for it to take effect."
+}
+
+# main
 main(){
 	local config="./etc/wazuh_netmgr.conf"
 	local action=""
@@ -568,10 +804,10 @@ main(){
 	# Set opt index
 	OPTIND=1
 
-	while getopts "h?vc:" opt; do
+	while getopts "h?sc:" opt; do
 		case "$opt" in
 		h|\?)	func_show_help && exit 0	;;
-		v)		VERBOSE=1					;;
+		s)		VERBOSE=0					;;
 		c)		config=$OPTARG				;;
 		esac
 	done
@@ -603,6 +839,8 @@ main(){
 	"disable")		func_disable			;;
 	"register")	 	func_register "$@"		;;
 	"unregister")   func_unregister "$@"	;;
+	"clean")		func_clean "$@"			;;
+	"edit")			func_edit "$@"			;;
 	*)				func_show_help			;;
 	esac
 }
