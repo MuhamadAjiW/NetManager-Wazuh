@@ -8,9 +8,9 @@ WAZUH_LOG_PATH="/var/ossec/logs/ossec.log"
 
 # Wazuh Netmanager configuration
 NETMGR_WAZUH_LOG_PATH="/var/log/wazuh"
-NETMGR_WAZUH_DATA_PATH="./data/wazuh_netmgr.data"
+NETMGR_WAZUH_DATA_PATH="./data/netmgr_wazuh.data"
 NETMGR_WAZUH_LIB_PATH="./lib"
-NETMGR_WAZUH_RSYSLOG_PATH="/etc/rsyslog.d/wazuh-netmgr-rsyslog.conf"
+NETMGR_WAZUH_RSYSLOG_PATH="/etc/rsyslog.d/netmgr-wazuh-rsyslog.conf"
 NETMGR_BASE_LIB_PATH="../../lib"
 
 # Other important configuration variables
