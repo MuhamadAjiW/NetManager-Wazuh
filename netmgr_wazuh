@@ -377,10 +377,6 @@ Options:
 	-h              Shows this help message
 	-c <config>     Specifies configuration file
 	-s              Enable silent mode
-
-
-Note:
-	This script does not change the network appliances and should be configured separately.
 	" 	
 }
 
