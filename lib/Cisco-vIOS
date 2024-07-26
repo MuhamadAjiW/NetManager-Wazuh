@@ -1,83 +1,53 @@
 #!/bin/bash
 # command library for cisco, do not use outside of wazuh_netmgr
 
-lib_execute_command(){
-	[ $VERBOSE -eq 1 ] && echo "Executing command on ssh..."
-	local method=$1
-	local ip=$2
-	local username=$3
-	local password=$4
-	local commands=$5
-	local retcode=0
-	
-	case "$method" in
-		password)
-			if [ $VERBOSE -eq 1 ]; then
-				sshpass -p "$password" ssh -o StrictHostKeyChecking=no $username@$ip <<EOF
-$commands
-EOF
-			else
-				sshpass -p "$password" ssh -o StrictHostKeyChecking=no $username@$ip <<EOF > /dev/null 2>&1
-$commands
-EOF
-			fi
-			retcode=$?
-			;;
-		*)
-			echo "Error: Method $method is invalid or not available."
-			return 1
-			;;
-	esac
-    
-	[ $VERBOSE -eq 1 ] && [ $retcode -eq 0 ] && echo "Command execution success" || echo "Command execution failed"
-	return $retcode
-}
-
-lib_register_password(){
-	local ip=$1
-	local username=$2
-	local password=$3	
-	local retcode=0
+lib_register_node(){
+    local method=$1
+    local ip=$2
+    local username=$3
+    local password=$4
+    local retcode=0
     local commands="
-enable
-conf t
-logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
-
+    enable
+    conf t
+    logging host $WAZUH_SERVER_IP
+    logging trap informational
+    end
+    write memory
+    exit"
+    
     echo "Registering Cisco-vIOS with ip: $ip..."
     [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
-
-	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
-
-	retcode=$?
+    
+    lib_execute_ssh "$method" "$ip" "$username" "$password" "$commands"
+    
+    retcode=$?
     [ $retcode -eq 0 ] && echo "Cisco-vIOS registration success" || echo "Cisco-vIOS registration failed"
-	return $retcode
+    return $retcode
 }
 
-lib_unregister_password(){
-	local ip=$1
-	local username=$2
-	local password=$3
-	local retcode=0
+lib_unregister_node(){
+    local method=$1
+    local ip=$2
+    local username=$3
+    local password=$4
+    local retcode=0
     local commands="
-enable
-conf t
-no logging host $WAZUH_SERVER_IP
-logging trap informational
-end
-write memory
-exit"
-
+    enable
+    conf t
+    no logging host $WAZUH_SERVER_IP
+    logging trap informational
+    end
+    write memory
+    exit"
+    
     echo "Unregistering Cisco-vIOS with ip: $ip..."
     [ $VERBOSE -eq 1 ] && echo "Wazuh ip addr is $WAZUH_SERVER_IP"
-
-	lib_execute_command "password" "$ip" "$username" "$password" "$commands"
-
-	retcode=$?
+    
+    lib_execute_ssh "$method" "$ip" "$username" "$password" "$commands"
+    
+    retcode=$?
     [ $retcode -eq 0 ] && echo "Cisco-vIOS unregistration success" || echo "Cisco-vIOS unregistration failed"
-	return $retcode
+    return $retcode
 }
 
