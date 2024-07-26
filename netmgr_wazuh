@@ -8,8 +8,8 @@ fi
 
 # Global Variables
 VERBOSE=1
-NETMGR_MARKER_MAIN="Wazuh_Netmgr"
-NETMGR_MARKER_NODE="Wazuh_Netmgr_Node"
+NETMGR_MARKER_MAIN="Netmgr"
+NETMGR_MARKER_NODE="Netmgr_Node"
 
 # Internal functions
 validate_ip() {
@@ -447,7 +447,7 @@ func_reset(){
 	[ $VERBOSE -eq 1 ] && echo "Deleting Netmanager ossec data..."
 	[ -f "$NETMGR_DATA_PATH" ] && rm "$NETMGR_DATA_PATH"
 
-	echo "Wazuh Netmanager has been reset. Use \"wazuh_netmgr reload\" for it to take effect."
+	echo "Wazuh Netmanager has been reset. Use \"netmgr_wazuh reload\" for it to take effect."
 }
 
 func_clean(){
@@ -464,14 +464,14 @@ func_clean(){
 		case "$opt" in
 		h|\?)
 			echo "
-Usage: wazuh_netmgr register [-i ip address] or [-f file path] or [-a]
+Usage: netmgr_wazuh register [-i ip address] or [-f file path] or [-a]
 
 Required:
 	-i <ip address>     : The ip address of the added node
 	-f <file path>      : The path for bulk removing logs
 	-a                  : Cleans all log file
 
-Example file format at ./data/wazuh_netmgr.data.example
+Example file format at ./data/netmgr_wazuh.data.example
 " && exit 0;;
 		a)	all=1				;;
 		i)	ip=$OPTARG			;;
@@ -561,7 +561,7 @@ func_enable(){
 	if [ $count -eq 2 ]; then
 		echo "Wazuh net logging has already been enabled."
 	else
-		echo "Wazuh net logging enabled. Use \"wazuh_netmgr reload\" for it to take effect."
+		echo "Wazuh net logging enabled. Use \"netmgr_wazuh reload\" for it to take effect."
 	fi
 }
 
@@ -587,7 +587,7 @@ func_disable(){
 	if [ $count -eq 2 ]; then
 		echo "Wazuh net logging has already been disabled."
 	else
-		echo "Wazuh net logging disabled. Use \"wazuh_netmgr reload\" for it to take effect."
+		echo "Wazuh net logging disabled. Use \"netmgr_wazuh reload\" for it to take effect."
 	fi
 }
 
@@ -626,7 +626,7 @@ func_register(){
 		case "$opt" in
 		h|\?)
 			echo "
-Usage: wazuh_netmgr register [-o output path] [-i ip address] [-n name] or [-f file path]
+Usage: netmgr_wazuh register [-o output path] [-i ip address] [-n name] or [-f file path]
 
 Required:
 	-o <output path>    : Specifies the path for incoming logs
@@ -635,7 +635,7 @@ Required:
 	or
 	-f <file path>      : The path for bulk adding nodes
 
-Example file format at ./data/wazuh_netmgr.data.example
+Example file format at ./data/netmgr_wazuh.data.example
 
 Optional:
 	-l <library>        : Library used for configuring the network appliance (default is none)
@@ -688,7 +688,7 @@ Authentication Methods:
 		exit 1
 	fi
 
-	echo "Registration complete. Use \"wazuh_netmgr reload\" for it to take effect."
+	echo "Registration complete. Use \"netmgr_wazuh reload\" for it to take effect."
 }
 
 func_unregister(){
@@ -703,7 +703,7 @@ func_unregister(){
 	while getopts "h?i:f:" opt; do
 		case "$opt" in
 		h|\?)
-			echo "Usage: wazuh_netmgr unregister [-i ip address]" && exit 0;;
+			echo "Usage: netmgr_wazuh unregister [-i ip address]" && exit 0;;
 		i)	ip=$OPTARG		;;
 		f)	file=$OPTARG	;;
 		esac
@@ -731,7 +731,7 @@ func_unregister(){
 		exit 1
 	fi
 
-	echo "Unregistration complete. Use \"wazuh_netmgr reload\" for it to take effect."
+	echo "Unregistration complete. Use \"netmgr_wazuh reload\" for it to take effect."
 }
 
 func_edit(){
@@ -753,7 +753,7 @@ func_edit(){
 		case "$opt" in
 		h|\?)
 			echo "
-Usage: wazuh_netmgr edit [-i ip address]
+Usage: netmgr_wazuh edit [-i ip address]
 
 Required:
 	-i <ip address>     : The ip address of the added node
@@ -793,12 +793,12 @@ Note:
 		exit 1
 	fi
 
-	echo "Edit complete. Use \"wazuh_netmgr reload\" for it to take effect."
+	echo "Edit complete. Use \"netmgr_wazuh reload\" for it to take effect."
 }
 
 # main
 main(){
-	local config="./etc/wazuh_netmgr.conf"
+	local config="./etc/netmgr_wazuh.conf"
 	local action=""
 
 	# Set opt index
@@ -825,7 +825,7 @@ main(){
 
 	if [ "$action" != "init" ]; then
 		if ! validate_init; then
-			echo "Error: Wazuh Netmanager has not been initialized yet, initialize with \"wazuh_netmgr init\""
+			echo "Error: Wazuh Netmanager has not been initialized yet, initialize with \"netmgr_wazuh init\""
 			exit 1
 		fi
 	fi
