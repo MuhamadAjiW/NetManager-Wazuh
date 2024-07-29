@@ -53,7 +53,7 @@ netmgr_clean_node(){
     local ip=$1
     local fullpath=""
 
-    grep ";$ip;" "$NETMGR_WAZUH_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
+    grep ";$ip;" "$NETMGR_WAZUH_DATA_PATH" | while ifs=',' read -r path ip name library method username password; do
         if [[ -z "$path" || "$path" == "#"* ]]; then
             continue
         fi
@@ -71,7 +71,7 @@ netmgr_clean_file(){
     local file=$1
     local fullpath=""
 
-    while IFS=';' read -r path ip name library method username password; do
+    while ifs=',' read -r path ip name library method username password; do
         if [[ -z "$path" || "$path" == "#"* ]]; then
             continue
         fi
@@ -127,7 +127,7 @@ netmgr_edit_node(){
         return 1
     fi
 
-    IFS=';' read -r file_path file_ip file_name file_library file_method file_username file_password <<< "$line"
+    ifs=',' read -r file_path file_ip file_name file_library file_method file_username file_password <<< "$line"
 
     local old_fullpath="$NETMGR_WAZUH_LOG_PATH/$file_path"
     local old_name="$file_name"
@@ -264,7 +264,7 @@ netmgr_register_file(){
         return 1
     fi
 
-    while IFS=';' read -r path ip name library method username password; do
+    while ifs=',' read -r path ip name library method username password; do
         if [[ -z "$path" || "$path" == "#"* ]]; then
             continue
         fi
@@ -345,7 +345,7 @@ netmgr_unregister_file(){
         return 1
     fi
 
-    while IFS=';' read -r path ip name library method username password; do
+    while ifs=',' read -r path ip name library method username password; do
         if [[ -z "$path" || "$path" == "#"* ]]; then
             continue
         fi
@@ -507,7 +507,7 @@ Enabled = $enabled
 Node count = $node_count
 
 Nodes:"
-    while IFS=';' read -r path ip name library method username password; do
+    while ifs=',' read -r path ip name library method username password; do
         if [[ -z "$path" || "$path" == "#"* ]]; then
             continue
         fi
@@ -703,7 +703,7 @@ func_unregister(){
         [ $? -ne 0 ] && exit $?
 
     elif [ ! -z "$ip" ]; then
-        grep ";$ip;" "$NETMGR_WAZUH_DATA_PATH" | while IFS=';' read -r path ip name library method username password; do
+        grep ";$ip;" "$NETMGR_WAZUH_DATA_PATH" | while ifs=',' read -r path ip name library method username password; do
             if [[ -z "$path" || "$path" == "#"* ]]; then
                 continue
             fi

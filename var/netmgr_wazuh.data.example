@@ -1,2 +1,2 @@
-test.log;192.168.1.1;testnode;none;none;none;none
-test2.log;192.168.1.2;testnode2;none;none;none;none
+test.log,192.168.1.1,testnode,none,none,none,none
+test2.log,192.168.1.2,testnode2,none,none,none,none
