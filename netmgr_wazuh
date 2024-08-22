@@ -452,7 +452,9 @@ Usage: netmgr_wazuh register [-i ip address] or [-f file path] or [-a]
 
 Required:
     -i <ip address>     : The ip address of the added node
+    or
     -f <file path>      : The path for bulk removing logs
+    or
     -a                  : Cleans all log file
 
 Example file format at ./data/netmgr_wazuh.data.example
@@ -687,7 +689,14 @@ func_unregister(){
     while getopts "h?i:f:" opt; do
         case "$opt" in
         h|\?)
-            echo "Usage: netmgr_wazuh unregister [-i ip address]" && exit 0;;
+            echo "
+Usage: netmgr_wazuh unregister [-i ip address] or [-f file path]
+
+Required:
+    -i <ip address>     : The ip address of the added node
+    or
+    -f <file path>      : The path for bulk removing logs
+" && exit 0;;
         i)    ip=$OPTARG      ;;
         f)    file=$OPTARG    ;;
         esac
